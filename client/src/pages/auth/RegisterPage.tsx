@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { fieldErrors, RegisterSchema } from '@campuscare/shared';
 import { register } from '../../api/auth';
@@ -12,7 +12,6 @@ import { AuthShell } from './AuthShell';
 
 export function RegisterPage() {
   const { user, setUser } = useAuth();
-  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -24,9 +23,10 @@ export function RegisterPage() {
 
   const mutation = useMutation({
     mutationFn: register,
-    onSuccess: (u) => {
-      setUser(u);
-      navigate('/student', { replace: true });
+    onSuccess: async (u) => {
+      await setUser(u);
+      // No navigate() here: once the user is set, this page re-renders and its
+      // <Navigate> below redirects (a second navigation caused a flicker/remount).
     },
     onError: (err) =>
       setErrors(

@@ -1,6 +1,8 @@
 import type {
   Category,
   DepartmentDTO,
+  DuplicateSuggestionDTO,
+  Paginated,
   SettingsDTO,
   SettingsUpdateInput,
   StaffDTO,
@@ -33,3 +35,17 @@ export const updateDepartmentCategories = (id: string, categories: Category[]) =
   apiSend<{ department: DepartmentDTO }>('PATCH', `/admin/departments/${id}`, { categories }).then(
     (r) => r.department,
   );
+
+export type DuplicateTab = 'pending' | 'confirmed' | 'dismissed';
+
+export const listDuplicates = (status: DuplicateTab, page = 1) =>
+  apiFetch<Paginated<DuplicateSuggestionDTO>>(
+    `/admin/duplicates${toQueryString({ status, page })}`,
+  );
+
+/** Confirming only LINKS the tickets; nothing is merged or closed. */
+export const decideDuplicate = (id: string, decision: 'confirmed' | 'dismissed', note?: string) =>
+  apiSend<{ suggestion: { id: string; status: string } }>('PATCH', `/admin/duplicates/${id}`, {
+    decision,
+    note,
+  });

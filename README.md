@@ -2,7 +2,7 @@
 
 An agentic campus problem-routing system: students report campus problems, AI classifies and prioritises them, the system routes them to the right department, flags possible duplicates, and tracks every ticket to resolution.
 
-> **Project status:** Student portal, ticket tracking, admin/staff dashboard, login & roles, and **AI complaint understanding + automatic routing** are working. Duplicate detection and notifications are **not built yet**. See [PLAN.md](PLAN.md).
+> **Project status:** Student portal, ticket tracking, admin/staff dashboard, login & roles, AI complaint understanding + automatic routing, and **duplicate suggestions** are working. Notifications are **not built yet**. See [PLAN.md](PLAN.md).
 
 ## Tech stack
 
@@ -105,6 +105,10 @@ Admins change the rules, deadlines and category → department map on the **Sett
 **Enabling Gemini:** put your key in `.env` as `GEMINI_API_KEY=...` and restart `npm run dev`. The key is read only by the server; the browser only learns whether AI is configured. Without a key everything still works using the keyword classifier (all complaints then go to admin review).
 
 **Measuring the AI:** `npm run ai:eval -w server` runs 20 labelled complaints (in `server/src/services/ai/evalComplaints.ts`) through the configured classifier and prints accuracy. With a key this makes ~20 Gemini API calls.
+
+### Duplicate suggestions
+
+New complaints are compared with recent open ones (text, location and category). Likely repeats appear on the admin **Duplicates** page with a match score and reasons. Confirming only **links** the new ticket to the original and tells the student — nothing is merged, closed or deleted. The threshold and time window are on the Settings page.
 
 ### What you can do in the app
 

@@ -23,6 +23,7 @@ export const ticketFixture = (overrides: Partial<TicketDetailDTO> = {}): TicketD
   reviewReasons: [],
   classification: null,
   ai: null,
+  duplicates: { duplicateOf: null, suggestions: [] },
   routing: null,
   resolvedAt: null,
   statusHistory: [{ from: null, to: 'Submitted', by: null, at: new Date().toISOString() }],

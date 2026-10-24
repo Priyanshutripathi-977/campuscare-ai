@@ -12,17 +12,20 @@ interface AuthState {
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
-  setUser: (user: UserDTO | null) => void;
+  setUser: (user: UserDTO | null) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
 /**
- * Forget every cached ticket/stat from the previous user, but keep the ['me'] query
- * itself (clearing it would disconnect the components that are watching it).
+ * Switches the cached "current user". First cancels any session check still in flight —
+ * otherwise a slow "nobody is logged in" answer could arrive after login and overwrite it.
+ * Then forgets every cached ticket/stat from the previous user, keeping the ['me'] query
+ * itself (removing it would disconnect the components that are watching it).
  */
-function switchUser(queryClient: QueryClient, user: UserDTO | null) {
+async function switchUser(queryClient: QueryClient, user: UserDTO | null) {
+  await queryClient.cancelQueries({ queryKey: ['me'] });
   queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
   queryClient.setQueryData(['me'], user);
 }

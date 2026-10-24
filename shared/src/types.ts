@@ -3,7 +3,7 @@
  * The server builds these; the client uses them for type-safe rendering.
  */
 import type { Category, Priority, Role, Status } from './constants';
-import type { RoutingRules } from './ai';
+import type { DuplicateRules, RoutingRules } from './ai';
 
 export interface UserDTO {
   id: string;
@@ -79,6 +79,7 @@ export interface TicketDetailDTO extends TicketSummaryDTO {
   ai: AiAnalysisDTO | { clarificationQuestion: string | null; needsClarification: boolean } | null;
   routing: { method: 'auto' | 'manual' | 'admin_review'; reason: string; decidedAt: string } | null;
   resolvedAt: string | null;
+  duplicates: TicketDuplicatesDTO;
   statusHistory: StatusHistoryEntry[];
   updates: TicketUpdateEntry[];
 }
@@ -109,6 +110,8 @@ export interface StatsDTO {
   open: number;
   overdue: number;
   needsReview: number;
+  /** Pending duplicate suggestions (admins only; null for staff). */
+  pendingDuplicates: number | null;
   resolved: number;
   avgResolutionHours: number | null;
   byStatus: Record<string, number>;
@@ -121,6 +124,35 @@ export interface StatsDTO {
 export interface SettingsDTO {
   slaHours: Record<Priority, number>;
   routing: RoutingRules;
+  duplicates: DuplicateRules;
+}
+
+export type DuplicateStatus = 'pending' | 'confirmed' | 'dismissed';
+
+/** A suggested duplicate pair. `ticket` is the newer complaint, `candidate` the possible original. */
+export interface DuplicateSuggestionDTO {
+  id: string;
+  score: number;
+  reasons: string[];
+  status: DuplicateStatus;
+  ticket: TicketSummaryDTO;
+  candidate: TicketSummaryDTO;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedBy: { id: string; name: string } | null;
+  note: string | null;
+}
+
+/** Duplicate info on a ticket. `suggestions` is only filled for admins. */
+export interface TicketDuplicatesDTO {
+  duplicateOf: { ticketId: string; title?: string } | null;
+  suggestions: {
+    id: string;
+    score: number;
+    reasons: string[];
+    status: DuplicateStatus;
+    other: { ticketId: string; title: string; status: Status };
+  }[];
 }
 
 export interface ApiErrorBody {

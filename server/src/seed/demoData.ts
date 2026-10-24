@@ -11,6 +11,8 @@ import { UserModel } from '../models/User';
 import { TicketModel } from '../models/Ticket';
 import { getSettings } from '../models/Settings';
 import { nextTicketId } from '../utils/ticketId';
+import { DuplicateSuggestionModel } from '../models/DuplicateSuggestion';
+import { detectDuplicates } from '../services/duplicate.service';
 
 /** Demo-only password for every demo account. Never use this for real accounts. */
 export const DEMO_PASSWORD = 'Demo@1234';
@@ -196,6 +198,19 @@ const DEMO_TICKETS: DemoTicket[] = [
     status: 'Under Review',
     daysAgo: 1,
   },
+  // Demo duplicate: same problem as the library Wi-Fi ticket, reported by another student.
+  {
+    student: 1,
+    title: 'Library wifi not working',
+    description:
+      'No internet in the library reading hall. The WiFi disconnects every few minutes and nobody can load anything.',
+    building: 'Central Library',
+    room: 'Reading Hall 1',
+    category: 'IT',
+    priority: 'High',
+    status: 'Assigned',
+    daysAgo: 2,
+  },
   {
     student: 0,
     title: 'Library entry gate scanner broken',
@@ -214,12 +229,17 @@ export interface SeedResult {
   departments: number;
   users: number;
   tickets: number;
+  duplicateSuggestions?: number;
   skippedTickets: boolean;
 }
 
 export async function seedDemoData({ reset = false } = {}): Promise<SeedResult> {
   if (reset) {
     // Only removes records flagged as demo data — real data is never touched.
+    const demoIds = await TicketModel.find({ isDemo: true }).distinct('_id');
+    await DuplicateSuggestionModel.deleteMany({
+      $or: [{ ticket: { $in: demoIds } }, { candidate: { $in: demoIds } }],
+    });
     await TicketModel.deleteMany({ isDemo: true });
     await UserModel.deleteMany({ isDemo: true });
   }
@@ -384,10 +404,17 @@ export async function seedDemoData({ reset = false } = {}): Promise<SeedResult> 
     });
   }
 
+  // Run real duplicate detection over the demo tickets (oldest first, like real submissions).
+  let duplicateSuggestions = 0;
+  for (const t of await TicketModel.find({ isDemo: true }).sort({ createdAt: 1 })) {
+    duplicateSuggestions += await detectDuplicates(t);
+  }
+
   return {
     departments: deptByCode.size,
     users: 1 + students.length + staff.length,
     tickets: ordered.length,
+    duplicateSuggestions,
     skippedTickets: false,
   };
 }

@@ -6,6 +6,7 @@ import { Types } from 'mongoose';
 import { CATEGORIES, PRIORITIES, STATUSES, type StatsDTO } from '@campuscare/shared';
 import { TicketModel } from '../models/Ticket';
 import { DepartmentModel } from '../models/Department';
+import { DuplicateSuggestionModel } from '../models/DuplicateSuggestion';
 import { visibilityFilter, type Actor } from './ticket.service';
 
 const DAYS = 14;
@@ -101,6 +102,10 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
   });
 
   const avgMs = facets!.resolution[0]?.avgMs ?? null;
+  const pendingDuplicates =
+    actor.role === 'admin'
+      ? await DuplicateSuggestionModel.countDocuments({ status: 'pending' })
+      : null;
   return {
     scope: actor.role === 'admin' ? 'all' : 'department',
     total,
@@ -108,6 +113,7 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
     resolved,
     overdue: facets!.overdue[0]?.count ?? 0,
     needsReview: facets!.needsReview[0]?.count ?? 0,
+    pendingDuplicates,
     avgResolutionHours: avgMs === null ? null : Math.round((avgMs / 3600_000) * 10) / 10,
     byStatus,
     byCategory: toRecord(facets!.byCategory, CATEGORIES, 'Unclassified'),

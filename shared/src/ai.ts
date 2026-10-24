@@ -70,6 +70,25 @@ export const RoutingRulesSchema = z.object({
 });
 export type RoutingRules = z.output<typeof RoutingRulesSchema>;
 
+/** Admin-editable duplicate-detection settings. */
+export const DuplicateRulesSchema = z.object({
+  /** Minimum similarity score (0–1) for a pair to be suggested as duplicates. */
+  threshold: z.number().min(0.3).max(0.95),
+  /** Only compare with open tickets created in the last N days. */
+  windowDays: z.number().int().min(1).max(180),
+});
+export type DuplicateRules = z.output<typeof DuplicateRulesSchema>;
+
+export const DuplicateDecisionSchema = z.object({
+  decision: z.enum(['confirmed', 'dismissed']),
+  note: z
+    .string()
+    .trim()
+    .max(300)
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+});
+
 export const SettingsUpdateSchema = z
   .object({
     slaHours: z
@@ -88,6 +107,7 @@ export const SettingsUpdateSchema = z
       .partial()
       .optional(),
     routing: RoutingRulesSchema.partial().optional(),
+    duplicates: DuplicateRulesSchema.partial().optional(),
   })
   .strict();
 export type SettingsUpdateInput = z.input<typeof SettingsUpdateSchema>;
