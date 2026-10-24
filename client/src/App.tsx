@@ -26,6 +26,7 @@ const TicketsPage = lazy(() =>
   import('./pages/admin/TicketsPage').then((m) => ({ default: m.TicketsPage })),
 );
 import { NotFoundPage } from './pages/NotFoundPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 
 function HomeRedirect() {
   const { user, isLoading } = useAuth();
@@ -96,6 +97,7 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -10,6 +10,7 @@ import { getSettings } from '../models/Settings';
 import { HttpError } from '../utils/HttpError';
 import { rankCandidates, type ComparableTicket } from './similarity';
 import { toTicketSummary, type PopulatedTicket } from './ticket.dto';
+import { notifyTicketEvent } from './notification.service';
 import type { Actor } from './ticket.service';
 
 const MAX_CANDIDATES = 300; // compare with at most this many recent tickets
@@ -144,6 +145,13 @@ export async function decideSuggestion(
       at: now,
     });
     await ticket.save();
+    await notifyTicketEvent(
+      ticket,
+      'duplicate_linked',
+      `Your complaint was linked to ${original.ticketId}, which reports the same problem. ${note ?? 'Both will be handled together.'}`,
+      ['student'],
+      actor.id,
+    );
   }
   return { id: String(updated._id), status: updated.status };
 }

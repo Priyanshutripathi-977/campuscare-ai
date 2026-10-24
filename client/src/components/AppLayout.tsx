@@ -5,6 +5,7 @@ import type { Role } from '@campuscare/shared';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { PageLoader } from './ui/States';
+import { NotificationBell } from './notifications/NotificationBell';
 
 const NAV: Record<Role, { to: string; label: string; end?: boolean }[]> = {
   student: [
@@ -70,6 +71,7 @@ export function AppLayout() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <div className="hidden text-right text-sm leading-tight sm:block">
               <p className="font-medium text-slate-900">{user.name}</p>
               <p className="text-xs capitalize text-slate-500">

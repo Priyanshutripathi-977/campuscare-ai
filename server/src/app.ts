@@ -14,6 +14,7 @@ import { getDatabaseStatus } from './db/connect';
 import { authRouter } from './routes/auth.routes';
 import { ticketsRouter } from './routes/tickets.routes';
 import { adminRouter } from './routes/admin.routes';
+import { notificationsRouter } from './routes/notifications.routes';
 
 export interface AppOptions {
   rateLimits?: Partial<RateLimitConfig>;
@@ -48,6 +49,7 @@ export function createApp(options: AppOptions = {}) {
   app.use('/api/auth', authRouter(limiters));
   app.use('/api/tickets', ticketsRouter(limiters));
   app.use('/api/admin', adminRouter());
+  app.use('/api/notifications', notificationsRouter());
 
   app.use(notFound);
   app.use(errorHandler);
