@@ -25,7 +25,14 @@ const EnvSchema = z.object({
       : z.string().min(32, 'must be at least 32 characters (see .env.example)'),
   MAX_UPLOAD_MB: z.coerce.number().positive().max(20).default(5),
   UPLOAD_DIR: z.string().default(path.resolve(import.meta.dirname, '../../uploads')),
-  GEMINI_API_KEY: z.string().optional(),
+  // Server-only secret. Never sent to the browser (only "is it configured?" is exposed).
+  GEMINI_API_KEY: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  GEMINI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(12_000),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

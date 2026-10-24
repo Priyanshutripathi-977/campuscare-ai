@@ -51,3 +51,7 @@ export const assignTicket = (
   id: string,
   body: { departmentId: string; assignedTo?: string | null; note?: string },
 ) => apiSend<Detail>('PATCH', path(id, 'assign'), body).then((r) => r.ticket);
+
+/** Admin: run the AI analysis again (only for tickets still under review). */
+export const reanalyzeTicket = (id: string) =>
+  apiSend<Detail>('POST', path(id, 'reanalyze')).then((r) => r.ticket);

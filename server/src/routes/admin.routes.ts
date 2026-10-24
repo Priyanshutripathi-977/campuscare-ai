@@ -1,11 +1,33 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { DepartmentDTO, StaffDTO } from '@campuscare/shared';
+import {
+  DepartmentCategoriesSchema,
+  SettingsUpdateSchema,
+  type Category,
+  type DepartmentDTO,
+  type SettingsDTO,
+  type StaffDTO,
+} from '@campuscare/shared';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { DepartmentModel } from '../models/Department';
 import { UserModel } from '../models/User';
+import { getSettings, SettingsModel } from '../models/Settings';
 import { getStats } from '../services/stats.service';
+import { getAiProvider } from '../services/ai/provider';
 import { parse } from '../utils/validate';
+import { HttpError } from '../utils/HttpError';
+
+const toDepartmentDTO = (d: {
+  _id: unknown;
+  name: string;
+  code: string;
+  categories: unknown;
+}): DepartmentDTO => ({
+  id: String(d._id),
+  name: d.name,
+  code: d.code,
+  categories: d.categories as Category[],
+});
 
 export function adminRouter() {
   const router = Router();
@@ -18,13 +40,7 @@ export function adminRouter() {
 
   router.get('/departments', async (_req, res) => {
     const depts = await DepartmentModel.find({ active: true }).sort({ name: 1 }).lean();
-    const out: DepartmentDTO[] = depts.map((d) => ({
-      id: String(d._id),
-      name: d.name,
-      code: d.code,
-      categories: d.categories as DepartmentDTO['categories'],
-    }));
-    res.json({ departments: out });
+    res.json({ departments: depts.map(toDepartmentDTO) });
   });
 
   router.get('/staff', requireRole('admin'), async (req, res) => {
@@ -50,6 +66,62 @@ export function adminRouter() {
       };
     });
     res.json({ staff: out });
+  });
+
+  // ----- Configurable routing (admin only) -----
+
+  /** Change which categories a department handles (the routing map). */
+  router.patch('/departments/:id', requireRole('admin'), async (req, res) => {
+    const { id } = parse(
+      z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id') }),
+      req.params,
+    );
+    const { categories } = parse(DepartmentCategoriesSchema, req.body);
+    const unique = [...new Set(categories)];
+
+    // Each category may belong to only ONE active department, otherwise routing would be ambiguous.
+    const conflict = await DepartmentModel.findOne({
+      _id: { $ne: id },
+      active: true,
+      categories: { $in: unique },
+    }).lean();
+    if (conflict) {
+      const clash = unique.filter((c) => (conflict.categories as string[]).includes(c));
+      throw new HttpError(
+        409,
+        `${clash.join(', ')} is already handled by ${conflict.name}. Remove it there first.`,
+      );
+    }
+    const dept = await DepartmentModel.findOneAndUpdate(
+      { _id: id },
+      { $set: { categories: unique } },
+      { returnDocument: 'after' },
+    ).lean();
+    if (!dept) throw new HttpError(404, 'Department not found');
+    res.json({ department: toDepartmentDTO(dept) });
+  });
+
+  router.get('/settings', requireRole('admin'), async (_req, res) => {
+    const settings: SettingsDTO = await getSettings();
+    res.json({
+      settings,
+      ai: {
+        configured: getAiProvider() !== null,
+        provider: getAiProvider()?.model ?? 'rule-based fallback',
+      },
+    });
+  });
+
+  router.patch('/settings', requireRole('admin'), async (req, res) => {
+    const input = parse(SettingsUpdateSchema, req.body);
+    await getSettings(); // make sure the document exists
+    const set: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input.slaHours ?? {})) set[`slaHours.${k}`] = v;
+    for (const [k, v] of Object.entries(input.routing ?? {})) set[`routing.${k}`] = v;
+    if (Object.keys(set).length === 0) throw new HttpError(400, 'Nothing to update');
+    await SettingsModel.updateOne({ key: 'global' }, { $set: set }, { runValidators: true });
+    const settings: SettingsDTO = await getSettings();
+    res.json({ settings });
   });
 
   return router;

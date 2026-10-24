@@ -1,12 +1,24 @@
 /// <reference types="vitest/config" />
+import fs from 'node:fs';
 import path from 'node:path';
-import { defineConfig, loadEnv } from 'vite';
+import { parseEnv } from 'node:util';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// Read API_PORT from the shared root .env (server-only values are NOT exposed to the browser).
-const rootEnv = loadEnv('development', path.resolve(import.meta.dirname, '..'), '');
-const apiPort = rootEnv.API_PORT || '4000';
+// Read ONLY API_PORT from the shared root .env, for the dev proxy.
+// (Vite's loadEnv() is deliberately not used: it would also pick up NODE_ENV=development
+// from that file and silently make production builds use React's development mode.)
+// Nothing from .env is exposed to browser code.
+function readApiPort(): string {
+  try {
+    const file = fs.readFileSync(path.resolve(import.meta.dirname, '../.env'), 'utf8');
+    return parseEnv(file).API_PORT || '4000';
+  } catch {
+    return '4000'; // no .env file yet
+  }
+}
+const apiPort = readApiPort();
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

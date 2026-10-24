@@ -19,6 +19,8 @@ import { UpdatesThread } from '../components/tickets/UpdatesThread';
 import { StatusActions } from '../components/tickets/StatusActions';
 import { ReopenAction } from '../components/tickets/ReopenAction';
 import { AdminRoutingPanel } from '../components/tickets/AdminRoutingPanel';
+import { AiAnalysisCard } from '../components/tickets/AiAnalysisCard';
+import { Alert } from '../components/ui/Alert';
 
 export function TicketDetailPage() {
   const { ticketId = '' } = useParams();
@@ -76,6 +78,17 @@ export function TicketDetailPage() {
         </div>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{t.title}</h1>
       </div>
+
+      {role === 'student' && t.ai && 'needsClarification' in t.ai && t.ai.needsClarification && (
+        <div className="mb-6">
+          <Alert tone="warning" title="We need a few more details">
+            <p>{t.ai.clarificationQuestion ?? 'Please describe the problem in more detail.'}</p>
+            <p className="mt-1">
+              Answer by adding an update below — your ticket will be re-checked automatically.
+            </p>
+          </Alert>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -140,6 +153,11 @@ export function TicketDetailPage() {
           {role === 'admin' && (
             <Card title="Classification & routing">
               <AdminRoutingPanel ticket={t} />
+            </Card>
+          )}
+          {isStaffOrAdmin && (
+            <Card title="AI analysis">
+              <AiAnalysisCard ticket={t} canRerun={role === 'admin'} />
             </Card>
           )}
           {isStaffOrAdmin && t.routing && (

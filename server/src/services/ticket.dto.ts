@@ -85,6 +85,7 @@ export function toTicketDetail(t: PopulatedTicket, viewerRole: Role): TicketDeta
             decidedAt: new Date(t.routing.decidedAt).toISOString(),
           }
         : null,
+    ai: toAiDTO(t, isStudentViewer),
     resolvedAt: t.resolvedAt ? new Date(t.resolvedAt).toISOString() : null,
     statusHistory: (t.statusHistory ?? []).map((h: PopulatedTicket) => ({
       from: h.from ?? null,
@@ -99,5 +100,38 @@ export function toTicketDetail(t: PopulatedTicket, viewerRole: Role): TicketDeta
       message: u.message,
       at: new Date(u.at).toISOString(),
     })),
+  };
+}
+
+function toAiDTO(t: PopulatedTicket, isStudentViewer: boolean): TicketDetailDTO['ai'] {
+  const ai = t.ai;
+  if (!ai) return null;
+  if (isStudentViewer) {
+    // Students only see a clarification request, and only while it is still relevant.
+    const asking = Boolean(ai.needsClarification) && t.status === 'Under Review';
+    return asking
+      ? { needsClarification: true, clarificationQuestion: ai.clarificationQuestion ?? null }
+      : null;
+  }
+  return {
+    source: ai.source,
+    model: ai.model ?? null,
+    valid: Boolean(ai.valid),
+    error: ai.error ?? null,
+    category: ai.category ?? null,
+    priority: ai.priority ?? null,
+    confidence: typeof ai.confidence === 'number' ? ai.confidence : null,
+    summary: ai.summary ?? null,
+    extractedLocation: ai.extractedLocation
+      ? { building: ai.extractedLocation.building ?? null, room: ai.extractedLocation.room ?? null }
+      : null,
+    keyDetails: ai.keyDetails ?? [],
+    categoryReason: ai.categoryReason ?? null,
+    priorityReason: ai.priorityReason ?? null,
+    needsClarification: Boolean(ai.needsClarification),
+    clarificationQuestion: ai.clarificationQuestion ?? null,
+    safetyRisk: Boolean(ai.safetyRisk),
+    recommendedDepartment: ref(ai.recommendedDepartment),
+    processedAt: new Date(ai.processedAt).toISOString(),
   };
 }

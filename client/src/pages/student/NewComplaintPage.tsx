@@ -121,11 +121,7 @@ export function NewComplaintPage() {
             <p className="mt-1 font-mono text-2xl font-semibold tracking-wide text-brand-700">
               {created.ticketId}
             </p>
-            <p className="mt-4 text-sm text-slate-600">
-              Current status: <strong>{created.status}</strong>. An administrator will review the
-              category and priority and route it to the right department. You can follow every step
-              on the ticket page.
-            </p>
+            <SubmissionOutcome ticket={created} />
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <ButtonLink to={`/tickets/${created.ticketId}`}>View ticket</ButtonLink>
               <Button
@@ -270,5 +266,37 @@ export function NewComplaintPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+/** Explains honestly what happened to the complaint after submission. */
+function SubmissionOutcome({ ticket }: { ticket: TicketDetailDTO }) {
+  const asking = ticket.ai && 'needsClarification' in ticket.ai && ticket.ai.needsClarification;
+  if (ticket.status === 'Assigned' && ticket.department) {
+    return (
+      <p className="mt-4 text-sm text-slate-600">
+        It has been sent to <strong>{ticket.department.name}</strong> ({ticket.category},{' '}
+        {ticket.priority} priority).
+      </p>
+    );
+  }
+  if (asking) {
+    return (
+      <div className="mt-4 text-left">
+        <Alert tone="warning" title="We need a few more details">
+          {ticket.ai && 'clarificationQuestion' in ticket.ai
+            ? ticket.ai.clarificationQuestion
+            : null}{' '}
+          Open the ticket and add an update to answer.
+        </Alert>
+      </div>
+    );
+  }
+  return (
+    <p className="mt-4 text-sm text-slate-600">
+      Current status: <strong>{ticket.status}</strong>. An administrator will confirm the category
+      and priority and route it to the right department. You can follow every step on the ticket
+      page.
+    </p>
   );
 }

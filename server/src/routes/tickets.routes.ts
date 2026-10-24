@@ -100,6 +100,12 @@ export function ticketsRouter(limiters: ReturnType<typeof createLimiters>) {
     res.json({ ticket: await tickets.classifyTicket(req.user!, ticketId, category, priority) });
   });
 
+  // Re-run the AI analysis (e.g. after editing the routing rules or adding a Gemini key).
+  router.post('/:ticketId/reanalyze', requireRole('admin'), async (req, res) => {
+    const { ticketId } = parse(TicketIdParam, req.params);
+    res.json({ ticket: await tickets.rerunAnalysis(req.user!, ticketId) });
+  });
+
   router.patch('/:ticketId/assign', requireRole('admin'), async (req, res) => {
     const { ticketId } = parse(TicketIdParam, req.params);
     const { departmentId, assignedTo, note } = parse(AssignSchema, req.body);
