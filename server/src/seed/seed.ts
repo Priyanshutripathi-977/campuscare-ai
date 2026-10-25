@@ -20,7 +20,7 @@ async function main() {
   console.log(
     result.skippedTickets
       ? 'ℹ️  Demo tickets already exist — skipped. Use "npm run seed -- --reset" to recreate them.'
-      : `✅ Demo tickets created: ${result.tickets}`,
+      : `✅ Demo tickets created: ${result.tickets} (duplicate suggestions found: ${result.duplicateSuggestions ?? 0})`,
   );
   console.log(`\nDemo logins (password for all: ${DEMO_PASSWORD})`);
   console.log(`  Admin:   ${DEMO_USERS.admin.email}`);

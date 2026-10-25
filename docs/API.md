@@ -72,4 +72,18 @@ Submitted → Under Review → (admin assigns) → Assigned → In Progress → 
 
 ## Not implemented yet (planned)
 
-Duplicate suggestions, notifications, staff account creation UI.
+Notifications, staff account creation UI.
+
+## Duplicate detection
+
+On every new complaint the server compares it with **older, open** complaints from the last `windowDays` days:
+
+`score = 0.55 × text similarity (TF-IDF cosine, place words removed) + 0.25 × location (building/room) + 0.20 × same category`, × 0.7 if the buildings are clearly different.
+
+Pairs scoring ≥ `threshold` (default 0.6) become **pending** suggestions with human-readable reasons. Each pair is suggested once (newer → older). Detection failures never block a submission.
+
+`ticket.duplicates` on the ticket page: `{ duplicateOf: { ticketId, title? } | null, suggestions: [...] }` — `suggestions` and the original's `title` only for admins.
+
+## Overdue
+
+`dueAt` is stored on the ticket (`createdAt + SLA hours for its priority`). A ticket is **overdue** when `dueAt` is in the past and its status is not Resolved — computed at read time, so it can never go stale.

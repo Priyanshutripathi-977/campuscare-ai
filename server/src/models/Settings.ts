@@ -1,5 +1,10 @@
 import { Schema, model, type InferSchemaType } from 'mongoose';
-import { CATEGORIES, type Priority, type RoutingRules } from '@campuscare/shared';
+import {
+  CATEGORIES,
+  type DuplicateRules,
+  type Priority,
+  type RoutingRules,
+} from '@campuscare/shared';
 
 /** One global settings document (key: 'global'), editable by admins via /api/admin/settings. */
 const settingsSchema = new Schema(
@@ -17,8 +22,10 @@ const settingsSchema = new Schema(
       reviewCriticalPriority: { type: Boolean, default: true },
       reviewCategories: { type: [{ type: String, enum: CATEGORIES }], default: ['Other'] },
     },
-    duplicateThreshold: { type: Number, default: 0.6, min: 0, max: 1 },
-    duplicateWindowDays: { type: Number, default: 30, min: 1 },
+    duplicates: {
+      threshold: { type: Number, default: 0.6, min: 0.3, max: 0.95 },
+      windowDays: { type: Number, default: 30, min: 1, max: 180 },
+    },
   },
   { timestamps: true },
 );
@@ -38,9 +45,12 @@ const DEFAULT_ROUTING: RoutingRules = {
   reviewCategories: ['Other'],
 };
 
+const DEFAULT_DUPLICATES: DuplicateRules = { threshold: 0.6, windowDays: 30 };
+
 export interface AppSettings {
   slaHours: Record<Priority, number>;
   routing: RoutingRules;
+  duplicates: DuplicateRules;
 }
 
 /**
@@ -56,5 +66,6 @@ export async function getSettings(): Promise<AppSettings> {
   return {
     slaHours: { ...DEFAULT_SLA_HOURS, ...(doc?.slaHours as Partial<Record<Priority, number>>) },
     routing: { ...DEFAULT_ROUTING, ...(doc?.routing as Partial<RoutingRules>) },
+    duplicates: { ...DEFAULT_DUPLICATES, ...(doc?.duplicates as Partial<DuplicateRules>) },
   };
 }

@@ -35,6 +35,17 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
+  // Other client mistakes reported by Express's body parser (body too large → 413,
+  // unsupported encoding/charset → 415, …). These are the client's fault, not a server crash.
+  if (err?.expose && typeof err.status === 'number' && err.status >= 400 && err.status < 500) {
+    const messages: Record<number, string> = {
+      413: 'Request is too large',
+      415: 'Unsupported request format',
+    };
+    res.status(err.status).json({ error: { message: messages[err.status] ?? 'Bad request' } });
+    return;
+  }
+
   console.error('Unhandled error:', err);
   res.status(500).json({
     error: {

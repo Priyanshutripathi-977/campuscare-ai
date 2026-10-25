@@ -74,7 +74,7 @@ export function DashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Total tickets" value={s.total} to="/admin/tickets" />
         <StatTile label="Open" value={s.open} hint="Not yet resolved" />
         {isAdmin && (
@@ -84,6 +84,14 @@ export function DashboardPage() {
             to="/admin/tickets?needsReview=true"
             tone="attention"
             hint="Awaiting classification / routing"
+          />
+        )}
+        {isAdmin && s.pendingDuplicates !== null && (
+          <StatTile
+            label="Possible duplicates"
+            value={s.pendingDuplicates}
+            to="/admin/duplicates"
+            hint="Waiting for your decision"
           />
         )}
         <StatTile

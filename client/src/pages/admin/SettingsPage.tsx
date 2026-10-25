@@ -98,6 +98,8 @@ function RulesForm({ initial }: { initial: SettingsDTO }) {
     initial.routing.reviewCategories,
   );
   const [sla, setSla] = useState<Record<Priority, number>>(initial.slaHours);
+  const [dupThreshold, setDupThreshold] = useState(Math.round(initial.duplicates.threshold * 100));
+  const [dupWindow, setDupWindow] = useState(initial.duplicates.windowDays);
   const [error, setError] = useState<string>();
 
   const save = useMutation({
@@ -109,6 +111,7 @@ function RulesForm({ initial }: { initial: SettingsDTO }) {
           reviewCategories,
         },
         slaHours: sla,
+        duplicates: { threshold: dupThreshold / 100, windowDays: dupWindow },
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['settings'] }),
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Could not save'),
@@ -120,6 +123,10 @@ function RulesForm({ initial }: { initial: SettingsDTO }) {
       return setError('Confidence threshold must be between 50 and 100%.');
     if (PRIORITIES.some((p) => !(Number.isInteger(sla[p]) && sla[p] >= 1)))
       return setError('Resolution times must be whole hours (at least 1).');
+    if (!(dupThreshold >= 30 && dupThreshold <= 95))
+      return setError('Duplicate match threshold must be between 30 and 95%.');
+    if (!(Number.isInteger(dupWindow) && dupWindow >= 1 && dupWindow <= 180))
+      return setError('Duplicate window must be 1–180 days.');
     setError(undefined);
     save.mutate();
   };
@@ -214,6 +221,47 @@ function RulesForm({ initial }: { initial: SettingsDTO }) {
           <p className="text-xs text-slate-500">
             Tickets open longer than this are shown as overdue. Applies to newly classified tickets.
           </p>
+        </div>
+      </Card>
+      <Card title="Duplicate detection" className="lg:col-span-2">
+        <div className="grid gap-5 text-sm sm:grid-cols-2">
+          <div>
+            <label htmlFor="dup-threshold" className="block font-medium text-slate-800">
+              Minimum match to suggest a duplicate
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                id="dup-threshold"
+                type="number"
+                min={30}
+                max={95}
+                value={dupThreshold}
+                onChange={(e) => setDupThreshold(Number(e.target.value))}
+                className={inputCls}
+              />
+              <span>%</span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Lower = more suggestions (more false alarms). Range 30–95%.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="dup-window" className="block font-medium text-slate-800">
+              Compare with open complaints from the last
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                id="dup-window"
+                type="number"
+                min={1}
+                max={180}
+                value={dupWindow}
+                onChange={(e) => setDupWindow(Number(e.target.value))}
+                className={inputCls}
+              />
+              <span>days</span>
+            </div>
+          </div>
         </div>
       </Card>
       <div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">

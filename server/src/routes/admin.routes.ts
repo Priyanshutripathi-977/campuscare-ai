@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import {
   DepartmentCategoriesSchema,
+  DuplicateDecisionSchema,
   SettingsUpdateSchema,
   type Category,
   type DepartmentDTO,
@@ -14,6 +15,7 @@ import { UserModel } from '../models/User';
 import { getSettings, SettingsModel } from '../models/Settings';
 import { getStats } from '../services/stats.service';
 import { getAiProvider } from '../services/ai/provider';
+import { decideSuggestion, listSuggestions } from '../services/duplicate.service';
 import { parse } from '../utils/validate';
 import { HttpError } from '../utils/HttpError';
 
@@ -68,6 +70,29 @@ export function adminRouter() {
     res.json({ staff: out });
   });
 
+  // ----- Duplicate suggestions (admin only) -----
+
+  router.get('/duplicates', requireRole('admin'), async (req, res) => {
+    const q = parse(
+      z.object({
+        status: z.enum(['pending', 'confirmed', 'dismissed']).default('pending'),
+        page: z.coerce.number().int().min(1).max(10_000).default(1),
+        limit: z.coerce.number().int().min(1).max(50).default(10),
+      }),
+      req.query,
+    );
+    res.json(await listSuggestions(q.status, q.page, q.limit));
+  });
+
+  router.patch('/duplicates/:id', requireRole('admin'), async (req, res) => {
+    const { id } = parse(
+      z.object({ id: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id') }),
+      req.params,
+    );
+    const { decision, note } = parse(DuplicateDecisionSchema, req.body);
+    res.json({ suggestion: await decideSuggestion(req.user!, id, decision, note) });
+  });
+
   // ----- Configurable routing (admin only) -----
 
   /** Change which categories a department handles (the routing map). */
@@ -118,6 +143,7 @@ export function adminRouter() {
     const set: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input.slaHours ?? {})) set[`slaHours.${k}`] = v;
     for (const [k, v] of Object.entries(input.routing ?? {})) set[`routing.${k}`] = v;
+    for (const [k, v] of Object.entries(input.duplicates ?? {})) set[`duplicates.${k}`] = v;
     if (Object.keys(set).length === 0) throw new HttpError(400, 'Nothing to update');
     await SettingsModel.updateOne({ key: 'global' }, { $set: set }, { runValidators: true });
     const settings: SettingsDTO = await getSettings();

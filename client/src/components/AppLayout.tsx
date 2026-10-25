@@ -18,6 +18,7 @@ const NAV: Record<Role, { to: string; label: string; end?: boolean }[]> = {
   admin: [
     { to: '/admin', label: 'Dashboard', end: true },
     { to: '/admin/tickets', label: 'All tickets' },
+    { to: '/admin/duplicates', label: 'Duplicates' },
     { to: '/admin/settings', label: 'Settings' },
   ],
 };

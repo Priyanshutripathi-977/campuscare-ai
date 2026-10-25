@@ -305,7 +305,9 @@ export function classifyWithRules(input: ComplaintInput): AiClassification {
   }
 
   // 3. Location: use what the student typed; try to spot a room number in the text.
-  const roomMatch = [input.title, input.description, ...(input.followUps ?? [])].join(' ').match(ROOM_PATTERN);
+  const roomMatch = [input.title, input.description, ...(input.followUps ?? [])]
+    .join(' ')
+    .match(ROOM_PATTERN);
 
   // 4. Vague complaints → ask for more information.
   const wordCount = input.description.trim().split(/\s+/).length;

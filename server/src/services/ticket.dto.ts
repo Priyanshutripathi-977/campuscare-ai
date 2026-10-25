@@ -8,6 +8,7 @@ import type {
   Role,
   Status,
   TicketDetailDTO,
+  TicketDuplicatesDTO,
   TicketSummaryDTO,
 } from '@campuscare/shared';
 
@@ -50,7 +51,11 @@ export function toTicketSummary(t: PopulatedTicket): TicketSummaryDTO {
   };
 }
 
-export function toTicketDetail(t: PopulatedTicket, viewerRole: Role): TicketDetailDTO {
+export function toTicketDetail(
+  t: PopulatedTicket,
+  viewerRole: Role,
+  duplicates: TicketDuplicatesDTO = { duplicateOf: null, suggestions: [] },
+): TicketDetailDTO {
   const isStudentViewer = viewerRole === 'student';
   return {
     ...toTicketSummary(t),
@@ -86,6 +91,7 @@ export function toTicketDetail(t: PopulatedTicket, viewerRole: Role): TicketDeta
           }
         : null,
     ai: toAiDTO(t, isStudentViewer),
+    duplicates,
     resolvedAt: t.resolvedAt ? new Date(t.resolvedAt).toISOString() : null,
     statusHistory: (t.statusHistory ?? []).map((h: PopulatedTicket) => ({
       from: h.from ?? null,

@@ -104,6 +104,8 @@ const ticketSchema = new Schema(
     resolvedAt: { type: Date, default: null },
     statusHistory: [statusHistorySchema],
     updates: [updateSchema],
+    // Set only when an ADMIN confirms this complaint repeats another one. Nothing is merged or deleted.
+    duplicateOf: { type: Schema.Types.ObjectId, ref: 'Ticket', default: null },
     isDemo: { type: Boolean, default: false }, // seeded demo data is clearly flagged
   },
   { timestamps: true },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { fieldErrors, LoginSchema } from '@campuscare/shared';
 import { login } from '../../api/auth';
@@ -12,7 +12,6 @@ import { AuthShell } from './AuthShell';
 
 export function LoginPage() {
   const { user, setUser } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
 
@@ -21,9 +20,10 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: login,
-    onSuccess: (u) => {
-      setUser(u);
-      navigate(from ?? homePathFor(u), { replace: true });
+    onSuccess: async (u) => {
+      await setUser(u);
+      // No navigate() here: once the user is set, this page re-renders and its
+      // <Navigate> below redirects (a second navigation caused a flicker/remount).
     },
     onError: (err) =>
       setErrors(
@@ -33,7 +33,8 @@ export function LoginPage() {
       ),
   });
 
-  if (user) return <Navigate to={homePathFor(user)} replace />;
+  // Covers both "already logged in" and "just logged in" (setUser re-renders this page).
+  if (user) return <Navigate to={from ?? homePathFor(user)} replace />;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();

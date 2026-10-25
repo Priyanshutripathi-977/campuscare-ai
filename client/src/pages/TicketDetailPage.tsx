@@ -20,6 +20,7 @@ import { StatusActions } from '../components/tickets/StatusActions';
 import { ReopenAction } from '../components/tickets/ReopenAction';
 import { AdminRoutingPanel } from '../components/tickets/AdminRoutingPanel';
 import { AiAnalysisCard } from '../components/tickets/AiAnalysisCard';
+import { DuplicatesPanel } from '../components/tickets/DuplicatesPanel';
 import { Alert } from '../components/ui/Alert';
 
 export function TicketDetailPage() {
@@ -153,6 +154,11 @@ export function TicketDetailPage() {
           {role === 'admin' && (
             <Card title="Classification & routing">
               <AdminRoutingPanel ticket={t} />
+            </Card>
+          )}
+          {(role === 'admin' || t.duplicates.duplicateOf) && (
+            <Card title="Duplicates">
+              <DuplicatesPanel ticket={t} isAdmin={role === 'admin'} />
             </Card>
           )}
           {isStaffOrAdmin && (

@@ -21,6 +21,7 @@ import { env } from '../config/env';
 import { getAiProvider } from './ai/provider';
 import { understandComplaint } from './ai/complaintUnderstanding';
 import { decideRouting } from './routing.service';
+import { detectDuplicates, duplicatesForTicket } from './duplicate.service';
 import { HttpError } from '../utils/HttpError';
 import { nextTicketId } from '../utils/ticketId';
 import type { StoredImage } from '../middleware/upload';
@@ -57,7 +58,7 @@ export async function getTicketDetail(actor: Actor, ticketId: string) {
     .populate(DETAIL_POPULATE)
     .lean();
   if (!ticket) throw new HttpError(404, 'Ticket not found');
-  return toTicketDetail(ticket, actor.role);
+  return toTicketDetail(ticket, actor.role, await duplicatesForTicket(actor, ticket));
 }
 
 export async function getTicketImage(actor: Actor, ticketId: string) {
@@ -94,6 +95,13 @@ export async function createTicket(actor: Actor, input: CreateInput, image: Stor
 
   // 2. Understand + route it.
   await analyzeAndRoute(ticket);
+
+  // 3. Look for similar open complaints (suggestions for an admin; never blocks submission).
+  try {
+    await detectDuplicates(ticket);
+  } catch (err) {
+    console.error('[duplicates] detection failed:', err);
+  }
   return getTicketDetail(actor, ticket.ticketId);
 }
 
