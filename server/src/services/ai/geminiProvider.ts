@@ -6,11 +6,14 @@ import type { AiProvider } from './types';
 export function createGeminiProvider({
   apiKey,
   model,
+  baseUrl,
 }: {
   apiKey: string;
   model: string;
+  /** Optional: a different server address (used by tests to run the real SDK against a local fake). */
+  baseUrl?: string;
 }): AiProvider {
-  const client = new GoogleGenAI({ apiKey });
+  const client = new GoogleGenAI({ apiKey, ...(baseUrl ? { httpOptions: { baseUrl } } : {}) });
   return {
     name: 'gemini',
     model,

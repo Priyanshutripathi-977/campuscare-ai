@@ -94,6 +94,14 @@ export const StatusChangeSchema = z
         });
       }
     }
+    // Sending a ticket back to an admin must say why, so the admin can act on it.
+    if (val.status === 'Under Review' && (!val.note || val.note.length < 5)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['note'],
+        message: 'Explain why this ticket needs admin review (at least 5 characters)',
+      });
+    }
   });
 export type StatusChangeInput = z.input<typeof StatusChangeSchema>;
 

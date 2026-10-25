@@ -17,7 +17,13 @@ export function TrendLineChart({ data }: { data: { date: string; count: number }
   return (
     <div className="h-56" aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+        <LineChart
+          // Charts are hidden from assistive tech (each has a data table instead), so they must not
+          // be keyboard-focusable either — Recharts' keyboard layer would make them focusable.
+          accessibilityLayer={false}
+          data={data}
+          margin={{ top: 8, right: 16, bottom: 0, left: -16 }}
+        >
           <CartesianGrid vertical={false} stroke={CHART.grid} />
           <XAxis
             dataKey="date"

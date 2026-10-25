@@ -74,7 +74,7 @@ _Talking point:_ "The system suggests and a human decides. Nothing is merged or 
 
 ## 7. Wrap-up (30 s)
 
-- 376 automated tests; the AI is optional and its failures are handled and shown honestly.
+- 389 automated tests; the AI is optional and its failures are handled and shown honestly.
 - Next steps: a real Gemini key and accuracy measurement, staff account management, deployment.
 
 ---

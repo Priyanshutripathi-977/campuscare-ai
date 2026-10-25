@@ -400,13 +400,42 @@ describe('role escalation and tampering', () => {
   it('staff cannot move a ticket in a way their role does not allow', async () => {
     const id = await ticketIn('Assigned');
     expect(
-      (await agents.deptStaff.patch(`/api/tickets/${id}/status`).send({ status: 'Under Review' }))
-        .status,
+      (
+        await agents.deptStaff
+          .patch(`/api/tickets/${id}/status`)
+          .send({ status: 'Resolved', confirm: true, note: 'Done now' })
+      ).status,
     ).toBe(409);
     expect(
       (await agents.deptStaff.patch(`/api/tickets/${id}/status`).send({ status: 'Reopened' }))
         .status,
     ).toBe(409);
+  });
+
+  it('staff can send their own ticket back to an admin, but only with a reason', async () => {
+    const id = await ticketIn('Assigned');
+    expect(
+      (await agents.deptStaff.patch(`/api/tickets/${id}/status`).send({ status: 'Under Review' }))
+        .status,
+    ).toBe(400);
+    expect(
+      (
+        await agents.otherStaff
+          .patch(`/api/tickets/${id}/status`)
+          .send({ status: 'Under Review', note: 'Not ours at all' })
+      ).status,
+    ).toBe(404);
+    const res = await agents.deptStaff
+      .patch(`/api/tickets/${id}/status`)
+      .send({ status: 'Under Review', note: 'This is a network cable, not electrical' });
+    expect(res.status).toBe(200);
+    const saved = await TicketModel.findOne({ ticketId: id }).lean();
+    expect(saved).toMatchObject({
+      status: 'Under Review',
+      needsReview: true,
+      reviewReasons: ['sent_back_for_review'],
+    });
+    expect(saved!.statusHistory.at(-1)!.note).toBe('This is a network cable, not electrical');
   });
 
   it('a session for a deleted user stops working immediately', async () => {

@@ -153,7 +153,7 @@ This starts the API (port 4000) and the website together. Open **http://localhos
 | Command                     | What it does                                                                                       |
 | --------------------------- | -------------------------------------------------------------------------------------------------- |
 | `npm run dev`               | Start API + website with auto-reload                                                               |
-| `npm test`                  | Run all 376 automated tests (server + client)                                                      |
+| `npm test`                  | Run all 389 automated tests (server + client)                                                      |
 | `npm run typecheck`         | Check TypeScript types in every package                                                            |
 | `npm run lint`              | Find code-quality problems                                                                         |
 | `npm run format`            | Auto-format all code                                                                               |
@@ -189,7 +189,7 @@ validate input ─► save ticket ("Submitted") ─► AI analysis ─► valida
 Submitted → Under Review → (admin assigns) → Assigned → In Progress → Resolved → Reopened
 ```
 
-Staff can only _start work_, _resolve_ (needs a note **and** a ticked confirmation) and _continue a reopened ticket_. Admins can also send tickets back for review. Only the student who reported a ticket can reopen it. Every change is stored with who, when and an optional note.
+Staff can only _start work_, _resolve_ (needs a note **and** a ticked confirmation), _continue a reopened ticket_, and _send a ticket back to an admin_ (needs a reason, e.g. "wrong department"; admins are notified). Only the student who reported a ticket can reopen it. Every change is stored with who, when and an optional note.
 
 **Overdue** means the stored deadline (submission time + the hours set for its priority) has passed and the ticket is not resolved. It is worked out each time it's shown, so it can never be out of date.
 

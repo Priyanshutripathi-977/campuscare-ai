@@ -54,13 +54,13 @@ Submitted → Under Review → (admin assigns) → Assigned → In Progress → 
                                    └─ send back ─┴────────────┘     Reopened → In Progress / Under Review
 ```
 
-| From → To                                        | Staff | Admin | Student            |
-| ------------------------------------------------ | ----- | ----- | ------------------ |
-| Assigned → In Progress                           | ✅    | ✅    | —                  |
-| In Progress → Resolved (confirm + note)          | ✅    | ✅    | —                  |
-| Reopened → In Progress                           | ✅    | ✅    | —                  |
-| Assigned / In Progress / Reopened → Under Review | —     | ✅    | —                  |
-| Resolved → Reopened                              | —     | —     | ✅ (via `/reopen`) |
+| From → To                                                          | Staff | Admin | Student            |
+| ------------------------------------------------------------------ | ----- | ----- | ------------------ |
+| Assigned → In Progress                                             | ✅    | ✅    | —                  |
+| In Progress → Resolved (confirm + note)                            | ✅    | ✅    | —                  |
+| Reopened → In Progress                                             | ✅    | ✅    | —                  |
+| Assigned / In Progress / Reopened → Under Review (reason required) | ✅    | ✅    | —                  |
+| Resolved → Reopened                                                | —     | —     | ✅ (via `/reopen`) |
 
 ## Admin / staff
 

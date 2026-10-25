@@ -62,6 +62,10 @@ export const STAFF_TRANSITIONS: readonly (readonly [Status, Status])[] = [
   ['Assigned', 'In Progress'],
   ['In Progress', 'Resolved'],
   ['Reopened', 'In Progress'],
+  // Wrong department / can't be handled here → back to an admin (a reason is required).
+  ['Assigned', 'Under Review'],
+  ['In Progress', 'Under Review'],
+  ['Reopened', 'Under Review'],
 ];
 
 export function canTransition(role: Role, from: Status, to: Status): boolean {

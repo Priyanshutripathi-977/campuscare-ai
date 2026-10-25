@@ -133,18 +133,16 @@ describe('who gets notified', () => {
     expect(await recipients()).not.toContain(ids.sunita);
   });
 
-  it('"send back for review" alerts the admins', async () => {
+  it('"send back for review" by staff alerts the admins, with the reason', async () => {
     const id = await assigned();
-    await TicketModel.updateOne({ ticketId: id }, { status: 'In Progress' });
-    await admin
+    const res = await sunita
       .patch(`/api/tickets/${id}/status`)
       .send({ status: 'Under Review', note: 'Wrong department' });
-    // The admin who acted is not notified; there is no other admin here.
-    expect(await recipients('sent_back_for_review')).toEqual([]);
-    const second = await createUser('admin', 'admin2@x.test');
-    await TicketModel.updateOne({ ticketId: id }, { status: 'In Progress' });
-    await admin.patch(`/api/tickets/${id}/status`).send({ status: 'Under Review' });
-    expect(await recipients('sent_back_for_review')).toEqual([String(second._id)]);
+    expect(res.status).toBe(200);
+    const rows = await NotificationModel.find({ type: 'sent_back_for_review' }).lean();
+    expect(rows.map((r) => String(r.user))).toEqual([ids.admin]);
+    expect(rows[0]!.message).toMatch(/sent this ticket back for review: Wrong department/);
+    expect(await recipients('sent_back_for_review')).not.toContain(ids.sunita); // not the actor
   });
 
   it('reopening alerts the department; updates go to the other side', async () => {

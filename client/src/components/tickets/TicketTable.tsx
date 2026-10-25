@@ -55,7 +55,9 @@ export function TicketTable({ tickets }: { tickets: TicketSummaryDTO[] }) {
                 <PriorityBadge priority={t.priority} />
               </td>
               <td className="px-4 py-3 text-slate-700">
-                <div>{t.category ?? <span className="text-slate-400">Unclassified</span>}</div>
+                <div>
+                  {t.category ?? <span className="text-slate-500 italic">Unclassified</span>}
+                </div>
                 <div className="text-xs text-slate-500">{t.department?.name ?? 'Unassigned'}</div>
               </td>
               <td className="whitespace-nowrap px-4 py-3">
@@ -71,7 +73,7 @@ export function TicketTable({ tickets }: { tickets: TicketSummaryDTO[] }) {
                         : relativeTime(t.dueAt)}
                   </span>
                 ) : (
-                  <span className="text-slate-400">Not set</span>
+                  <span className="text-slate-500 italic">Not set</span>
                 )}
               </td>
               <td
