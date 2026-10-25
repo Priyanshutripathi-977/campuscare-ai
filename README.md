@@ -4,12 +4,21 @@ A web app where **students report campus problems** (broken fans, Wi-Fi outages,
 
 AI suggests; plain, tested rules decide. A complaint is never lost if the AI fails, and the AI can never close, delete or escalate anything on its own.
 
-| Document                               | What's in it                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------ |
-| [docs/CHECKLIST.md](docs/CHECKLIST.md) | What works (and how it was verified), known limitations, remaining tasks |
-| [docs/DEMO.md](docs/DEMO.md)           | A 10-minute presentation script                                          |
-| [docs/API.md](docs/API.md)             | Every API endpoint, who may call it, and what it returns                 |
-| [PLAN.md](PLAN.md)                     | Original architecture, database design and roadmap, plus what changed    |
+| Document                                           | What's in it                                                                                                                             |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **[docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md)** | **Start here.** Architecture, AI workflow, database, security, limitations and future work, explained simply, plus likely viva questions |
+| [docs/DEMO.md](docs/DEMO.md)                       | Step-by-step 10-minute demo script                                                                                                       |
+| [docs/API.md](docs/API.md)                         | Every API endpoint, who may call it, and what it returns, plus a `curl` walkthrough                                                      |
+| [docs/CHECKLIST.md](docs/CHECKLIST.md)             | What works and how it was verified, known limitations, remaining tasks, audit results                                                    |
+| [PLAN.md](PLAN.md)                                 | Original architecture, database design and roadmap, plus what changed                                                                    |
+
+### Real vs. simulated (read before demoing)
+
+| Real and working                                                                                                                                                                               | Real integration, **off by default**                                                                                                                                                                       | Simulated / demo-only                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Website, API, login and roles, MongoDB storage, ticket IDs, statuses and history, routing rules, duplicate detection (TF-IDF), in-app notifications, dashboard numbers, the keyword classifier | **Google Gemini AI**: only with `GEMINI_API_KEY` in `.env`; otherwise the keyword classifier is used and the app labels it "Keyword fallback". **Email**: only with SMTP settings; otherwise "In-app only" | **Demo data** from `npm run seed` (fictional people and tickets, marked "Demo data"; their past history is invented, but their analysis comes from the real keyword classifier). The fake Gemini server and local mail server are used **only inside automated tests** |
+
+Gemini and email have been tested against realistic local stand-ins, but **not** against Google's real API or a real mail provider. Details: [PROJECT_GUIDE §2](docs/PROJECT_GUIDE.md#2-what-is-real-and-what-is-simulated).
 
 ---
 
@@ -81,6 +90,8 @@ brew services start mongodb/brew/mongodb-community
 
 (Or create a free MongoDB Atlas cluster and put its connection string in `MONGODB_URI` below.)
 
+**On Windows or Linux** _(not tested; the project was developed and verified on macOS)_: install Node.js 20 LTS from nodejs.org and MongoDB Community Server from mongodb.com, and start the MongoDB service. On Windows, use `copy .env.example .env` instead of `cp` in the next step. `bash scripts/api-walkthrough.sh` needs Git Bash or WSL.
+
 Then, inside the project folder:
 
 ```bash
@@ -122,7 +133,18 @@ All of these are read **only by the server**. The browser is only ever told _whe
 npm run seed -w server
 ```
 
-This creates **demo data, clearly labelled** "Demo data" in the app: 7 departments with their category mapping, 9 accounts, 14 sample tickets in every status, and one duplicate pair. To delete and recreate _only_ the demo data:
+This creates **demo data, clearly labelled** "Demo data" in the app:
+
+- 7 departments with their category → department mapping;
+- 9 accounts;
+- 15 sample tickets covering every status, including:
+  - one **duplicate pair** (two Wi-Fi reports);
+  - one **vague complaint** that asks the student a clarification question;
+  - one ticket where the classifier guessed wrong and an admin overrode it.
+
+Each demo ticket's analysis comes from the **real keyword classifier**, the same code a real complaint uses when Gemini is off. Gemini is deliberately not used for demo data, so the demo looks the same on every computer. Running the command again without `--reset` leaves existing demo tickets alone.
+
+To delete and recreate _only_ the demo data (demo tickets, demo accounts, and anything created **with** demo accounts while practising, such as tickets, photos and notifications; real users' data is never touched):
 
 ```bash
 npm run seed -w server -- --reset
@@ -135,6 +157,8 @@ npm run seed -w server -- --reset
 | Student            | `neha@campuscare.test`             | `Demo@1234` |
 | Staff (Electrical) | `electrical.staff@campuscare.test` | `Demo@1234` |
 | Staff (IT)         | `it.staff@campuscare.test`         | `Demo@1234` |
+
+To see the clarification question, log in as Neha (`neha@campuscare.test`).
 
 Other staff: `plumbing.staff@`, `housekeeping.staff@`, `academic.staff@` and `security.staff@` (all `@campuscare.test`). These are demo-only passwords; never reuse them. The seed refuses to run when `NODE_ENV=production`.
 
@@ -150,18 +174,21 @@ This starts the API (port 4000) and the website together. Open **http://localhos
 
 ## Useful commands
 
-| Command                     | What it does                                                                                       |
-| --------------------------- | -------------------------------------------------------------------------------------------------- |
-| `npm run dev`               | Start API + website with auto-reload                                                               |
-| `npm test`                  | Run all 389 automated tests (server + client)                                                      |
-| `npm run typecheck`         | Check TypeScript types in every package                                                            |
-| `npm run lint`              | Find code-quality problems                                                                         |
-| `npm run format`            | Auto-format all code                                                                               |
-| `npm run build`             | Production build of the website into `client/dist`                                                 |
-| `npm run seed -w server`    | Load demo data (`-- --reset` to recreate it)                                                       |
-| `npm run ai:eval -w server` | Measure the classifier on 20 labelled complaints (uses Gemini if a key is set; about 20 API calls) |
+| Command                           | What it does                                                                                                                                              |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                     | Start API + website with auto-reload                                                                                                                      |
+| `npm test`                        | Run all 392 automated tests (server + client)                                                                                                             |
+| `npm run typecheck`               | Check TypeScript types in every package                                                                                                                   |
+| `npm run lint`                    | Find code-quality problems                                                                                                                                |
+| `npm run format`                  | Auto-format all code                                                                                                                                      |
+| `npm run build`                   | Production build of the website into `client/dist`                                                                                                        |
+| `npm run seed -w server`          | Load demo data (`-- --reset` to recreate it)                                                                                                              |
+| `bash scripts/api-walkthrough.sh` | With the app running and demo data loaded: the full flow through the API with `curl` (submit → review → assign → resolve → track), plus 3 security checks |
+| `npm run ai:eval -w server`       | Measure the classifier on 20 labelled complaints (uses Gemini if a key is set; about 20 API calls)                                                        |
 
 ---
+
+All commands above were run successfully on 25 Oct 2026 (macOS, Node 20.20, npm 11.21); see [CHECKLIST §6](docs/CHECKLIST.md#6-documented-commands-verified-25-oct-2026).
 
 ## How it works
 

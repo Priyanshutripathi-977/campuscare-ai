@@ -12,10 +12,42 @@ Base URL: `/api` (in development the React app proxies `/api` to `http://localho
     }
   }
   ```
-- **Status codes:** `400` invalid input · `401` not logged in · `403` wrong role · `404` not found _or not yours_ · `409` action not allowed in the current state · `429` rate-limited · `503` database down.
+- **Status codes:** `400` invalid input · `401` not logged in · `403` wrong role · `404` not found _or not yours_ · `409` action not allowed in the current state · `413` body too large · `415` unsupported format · `429` rate-limited · `503` database down.
 - Validation rules live in [`shared/src/schemas.ts`](../shared/src/schemas.ts) and are used by both client and server.
 
 Roles: 🔓 public · 🎓 student · 🛠 staff · 👑 admin
+
+## Try it: the API with `curl`
+
+The fastest way to see the whole API working is the walkthrough script. Start the app (`npm run dev`), load demo data (`npm run seed -w server`), then run:
+
+```bash
+bash scripts/api-walkthrough.sh
+```
+
+It logs in as a student, submits a complaint, then as admin reads the AI analysis and assigns the ticket; as staff starts and resolves it; and as the student reads the history and notifications. It ends with three security checks that **must** be refused (403, 404, 401). It was last run successfully on 25 Oct 2026.
+
+The same calls by hand. The login cookie is saved to a file with `-c` and sent back with `-b`:
+
+```bash
+# Health (no login)
+curl -s http://localhost:4000/api/health
+
+# Log in as the demo student; the cookie is saved in student.txt
+curl -s -c student.txt -H 'Content-Type: application/json' \
+  -d '{"email":"student@campuscare.test","password":"Demo@1234"}' \
+  http://localhost:4000/api/auth/login
+
+# Submit a complaint (multipart form; the details go in the "data" field as JSON)
+curl -s -b student.txt \
+  -F 'data={"title":"Fan not working in room 101","description":"The ceiling fan in room 101 stopped working yesterday.","location":{"building":"Main Building","room":"101"}}' \
+  http://localhost:4000/api/tickets
+
+# My tickets, filtered
+curl -s -b student.txt 'http://localhost:4000/api/tickets?status=Under%20Review'
+```
+
+Add `-F 'image=@photo.jpg'` to attach a photo (JPG/PNG/WebP, ≤ 5 MB). Add `| jq` to any command to pretty-print the JSON.
 
 ## Health
 
