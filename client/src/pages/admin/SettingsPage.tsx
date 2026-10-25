@@ -70,6 +70,21 @@ export function SettingsPage() {
           The API key is stored only on the server. It is never sent to the browser.
         </p>
       </Card>
+      <Card title="Email notifications">
+        {settings.data.email.configured ? (
+          <Alert tone="success">
+            Email is configured. Notifications are also emailed; each one shows whether the email
+            was really sent.
+          </Alert>
+        ) : (
+          <Alert tone="info">
+            Email is not configured, so notifications are in-app only. To enable email, set{' '}
+            <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>,{' '}
+            <code>SMTP_PASS</code> and <code>SMTP_FROM</code> in the server's <code>.env</code> and
+            restart it.
+          </Alert>
+        )}
+      </Card>
       {/* key= remounts the form with fresh values after a successful save */}
       <RulesForm key={JSON.stringify(settings.data.settings)} initial={settings.data.settings} />
       <Card title="Department routing map">

@@ -33,6 +33,18 @@ const EnvSchema = z.object({
     .transform((v) => (v ? v : undefined)),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(12_000),
+  // Optional email (SMTP). If SMTP_HOST is empty, only in-app notifications are used.
+  SMTP_HOST: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_USER: z.string().trim().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().trim().default('CampusCare AI <no-reply@example.com>'),
+  // Used to build links in emails (defaults to the frontend address).
+  APP_URL: z.url().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

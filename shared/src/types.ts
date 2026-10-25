@@ -158,3 +158,20 @@ export interface TicketDuplicatesDTO {
 export interface ApiErrorBody {
   error: { message: string; details?: { fieldErrors?: Record<string, string> } };
 }
+
+export type EmailDeliveryStatus = 'not_configured' | 'pending' | 'sent' | 'failed';
+
+export interface NotificationDTO {
+  id: string;
+  type: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  ticket: { ticketId: string; title: string } | null;
+  /** What really happened with the email copy (never assumed). */
+  email: { status: EmailDeliveryStatus; error: string | null; sentAt: string | null };
+}
+
+export interface NotificationListDTO extends Paginated<NotificationDTO> {
+  unreadCount: number;
+}

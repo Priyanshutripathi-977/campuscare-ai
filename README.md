@@ -2,7 +2,7 @@
 
 An agentic campus problem-routing system: students report campus problems, AI classifies and prioritises them, the system routes them to the right department, flags possible duplicates, and tracks every ticket to resolution.
 
-> **Project status:** Student portal, ticket tracking, admin/staff dashboard, login & roles, AI complaint understanding + automatic routing, and **duplicate suggestions** are working. Notifications are **not built yet**. See [PLAN.md](PLAN.md).
+> **Project status:** All planned features are working: student portal, ticket tracking, admin/staff dashboard, login & roles, AI complaint understanding + automatic routing, duplicate suggestions, and in-app + optional email notifications. See [PLAN.md](PLAN.md).
 
 ## Tech stack
 
@@ -109,6 +109,12 @@ Admins change the rules, deadlines and category → department map on the **Sett
 ### Duplicate suggestions
 
 New complaints are compared with recent open ones (text, location and category). Likely repeats appear on the admin **Duplicates** page with a match score and reasons. Confirming only **links** the new ticket to the original and tells the student — nothing is merged, closed or deleted. The threshold and time window are on the Settings page.
+
+### Notifications
+
+Students, staff and admins get **in-app notifications** (the bell in the header, polled every 30 s) when something happens to a ticket they are involved in: routed/assigned, status changes (incl. the resolution note), replies, reopened, clarification requested, duplicate linked, sent back for review. The person who did the action is never notified about it.
+
+**Email (optional):** set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `.env`. Emails are sent in the background; each notification records what really happened — `sent`, `failed` (with the reason), or `In-app only` when email isn't configured. A failed email never blocks or fails the action.
 
 ### What you can do in the app
 

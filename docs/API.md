@@ -72,7 +72,30 @@ Submitted → Under Review → (admin assigns) → Assigned → In Progress → 
 
 ## Not implemented yet (planned)
 
-Notifications, staff account creation UI.
+Staff account creation UI, real-time (push) notifications — the app polls every 30 s.
+
+## Notifications (any logged-in user — only their own)
+
+| Method | Path                                       | Notes                                                                                                                                                                                                |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/notifications?unread=true&page&limit≤50` | `{ items: [{ id, type, message, read, createdAt, ticket: { ticketId, title }, email: { status: 'not_configured'\|'pending'\|'sent'\|'failed', error, sentAt } }], total, page, pages, unreadCount }` |
+| PATCH  | `/notifications/:id/read`                  | `404` for another user's notification.                                                                                                                                                               |
+| POST   | `/notifications/read-all`                  | `{ updated }`                                                                                                                                                                                        |
+
+Events → recipients (the actor is always excluded):
+
+| Event                                                | Notified                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| Auto-routed on submission                            | Department staff (or the assigned person)                 |
+| Assigned / reassigned by admin                       | Student + assigned staff member (or all department staff) |
+| Status changed                                       | Student (resolution note included)                        |
+| Sent back for review                                 | Admins                                                    |
+| Reopened                                             | Department staff / assignee                               |
+| Update posted                                        | The other side (student ↔ staff/assignee)                 |
+| Clarification requested / routed after clarification | Student                                                   |
+| Duplicate confirmed                                  | Student of the newer ticket                               |
+
+`GET /admin/settings` also returns `email: { configured }` — never SMTP host/user/password.
 
 ## Duplicate detection
 

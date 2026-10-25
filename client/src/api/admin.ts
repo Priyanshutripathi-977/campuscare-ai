@@ -24,6 +24,8 @@ export interface SettingsResponse {
   settings: SettingsDTO;
   /** Only whether AI is configured — the API key itself never leaves the server. */
   ai: { configured: boolean; provider: string };
+  /** Only whether email is on — SMTP settings never leave the server. */
+  email: { configured: boolean };
 }
 
 export const getSettings = () => apiFetch<SettingsResponse>('/admin/settings');

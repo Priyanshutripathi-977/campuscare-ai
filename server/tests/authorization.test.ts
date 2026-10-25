@@ -292,6 +292,42 @@ const rows: Row[] = [
     },
   },
   {
+    name: 'GET /notifications',
+    send: (w) => client(w).get('/api/notifications'),
+    expect: {
+      anon: 401,
+      owner: 200,
+      otherStudent: 200,
+      deptStaff: 200,
+      otherStaff: 200,
+      admin: 200,
+    },
+  },
+  {
+    name: 'POST /notifications/read-all',
+    send: (w) => client(w).post('/api/notifications/read-all'),
+    expect: {
+      anon: 401,
+      owner: 200,
+      otherStudent: 200,
+      deptStaff: 200,
+      otherStaff: 200,
+      admin: 200,
+    },
+  },
+  {
+    name: "PATCH /notifications/:id/read (someone else's or missing)",
+    send: (w) => client(w).patch('/api/notifications/0123456789abcdef01234567/read'),
+    expect: {
+      anon: 401,
+      owner: 404,
+      otherStudent: 404,
+      deptStaff: 404,
+      otherStaff: 404,
+      admin: 404,
+    },
+  },
+  {
     name: 'GET /admin/duplicates',
     send: (w) => client(w).get('/api/admin/duplicates'),
     expect: {

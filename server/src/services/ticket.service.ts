@@ -22,6 +22,7 @@ import { getAiProvider } from './ai/provider';
 import { understandComplaint } from './ai/complaintUnderstanding';
 import { decideRouting } from './routing.service';
 import { detectDuplicates, duplicatesForTicket } from './duplicate.service';
+import { notifyTicketEvent } from './notification.service';
 import { HttpError } from '../utils/HttpError';
 import { nextTicketId } from '../utils/ticketId';
 import type { StoredImage } from '../middleware/upload';
@@ -216,6 +217,31 @@ export async function analyzeAndRoute(
       }
     }
     await ticket.save();
+
+    // Notifications (the submitting student already sees the result on screen).
+    if (ticket.status === 'Assigned' && decision.recommendedDepartment) {
+      await notifyTicketEvent(
+        ticket,
+        'ticket_assigned',
+        `New ticket for ${decision.recommendedDepartment.name}: “${ticket.title}” (${ai.priority} priority).`,
+        ['department'],
+      );
+      if (trigger !== 'submitted') {
+        await notifyTicketEvent(
+          ticket,
+          'ticket_routed',
+          `Your complaint was sent to ${decision.recommendedDepartment.name}.`,
+          ['student'],
+        );
+      }
+    } else if (ai.needsClarification && trigger !== 'submitted') {
+      await notifyTicketEvent(
+        ticket,
+        'clarification_requested',
+        `We need more details: ${ai.clarificationQuestion ?? 'please describe the problem in more detail.'}`,
+        ['student'],
+      );
+    }
   } catch (err) {
     // Unexpected failure (e.g. database hiccup): never lose the ticket — send it to a human.
     console.error('[ai] analyzeAndRoute failed:', err);
@@ -322,6 +348,25 @@ export async function addUpdate(actor: Actor, ticketId: string, message: string)
   ticket.updates.push({ author: actor.id, authorRole: actor.role, message, at: new Date() });
   await ticket.save();
 
+  const preview = message.length > 120 ? `${message.slice(0, 117)}…` : message;
+  if (actor.role === 'student') {
+    await notifyTicketEvent(
+      ticket,
+      'update_added',
+      `The student added an update: “${preview}”`,
+      ['department'],
+      actor.id,
+    );
+  } else {
+    await notifyTicketEvent(
+      ticket,
+      'update_added',
+      `${actor.name} replied: “${preview}”`,
+      ['student'],
+      actor.id,
+    );
+  }
+
   // If we asked the student for more details and they answered, analyse the ticket again.
   if (
     actor.role === 'student' &&
@@ -364,6 +409,23 @@ export async function changeStatus(
   );
   if (!updated)
     throw new HttpError(409, 'The ticket was changed by someone else. Refresh and try again.');
+
+  const studentMessage =
+    to === 'Resolved'
+      ? `Your complaint was marked as resolved: ${note}. If it is not fixed, you can reopen it.`
+      : to === 'In Progress'
+        ? 'Work has started on your complaint.'
+        : `Your complaint's status changed to ${to}.`;
+  await notifyTicketEvent(ticket, 'status_changed', studentMessage, ['student'], actor.id);
+  if (to === 'Under Review') {
+    await notifyTicketEvent(
+      ticket,
+      'sent_back_for_review',
+      `${actor.name} sent this ticket back for review${note ? `: ${note}` : '.'}`,
+      ['admins'],
+      actor.id,
+    );
+  }
   return getTicketDetail(actor, ticketId);
 }
 
@@ -386,6 +448,13 @@ export async function reopenTicket(actor: Actor, ticketId: string, reason: strin
   );
   if (!updated)
     throw new HttpError(409, 'The ticket was changed by someone else. Refresh and try again.');
+  await notifyTicketEvent(
+    ticket,
+    'ticket_reopened',
+    `The student reopened this ticket: ${reason}`,
+    ['department'],
+    actor.id,
+  );
   return getTicketDetail(actor, ticketId);
 }
 
@@ -482,5 +551,20 @@ export async function assignTicket(
     at: now,
   });
   await ticket.save();
+
+  await notifyTicketEvent(
+    ticket,
+    'ticket_routed',
+    `Your complaint was ${isReassignment ? 'moved' : 'sent'} to ${department.name}.`,
+    ['student'],
+    actor.id,
+  );
+  await notifyTicketEvent(
+    ticket,
+    'ticket_assigned',
+    `${ticket.assignedTo ? 'Assigned to you' : `New ticket for ${department.name}`}: “${ticket.title}” (${ticket.priority} priority).`,
+    ['department'],
+    actor.id,
+  );
   return getTicketDetail(actor, ticketId);
 }

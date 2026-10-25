@@ -15,6 +15,7 @@ import { UserModel } from '../models/User';
 import { getSettings, SettingsModel } from '../models/Settings';
 import { getStats } from '../services/stats.service';
 import { getAiProvider } from '../services/ai/provider';
+import { getMailer } from '../services/mailer';
 import { decideSuggestion, listSuggestions } from '../services/duplicate.service';
 import { parse } from '../utils/validate';
 import { HttpError } from '../utils/HttpError';
@@ -134,6 +135,8 @@ export function adminRouter() {
         configured: getAiProvider() !== null,
         provider: getAiProvider()?.model ?? 'rule-based fallback',
       },
+      // Only whether email is on — never the SMTP host, user or password.
+      email: { configured: getMailer() !== null },
     });
   });
 
