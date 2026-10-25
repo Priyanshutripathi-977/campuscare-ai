@@ -50,6 +50,33 @@ describe('StatusActions (resolve confirmation)', () => {
     });
   });
 
+  it('requires a reason before staff send a ticket back to an admin', async () => {
+    const fetchSpy = mockApi([
+      ['/status', () => jsonResponse({ ticket: ticketFixture({ status: 'Under Review' }) })],
+    ]);
+    renderWithProviders(
+      <StatusActions ticket={ticketFixture({ status: 'Assigned' })} role="staff" />,
+      { user: staffUser },
+    );
+    await userEvent.click(screen.getByRole('button', { name: /send back for review/i }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /update status/i }));
+    expect(
+      within(dialog).getByText(/explain why this ticket needs admin review/i),
+    ).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    await userEvent.type(
+      within(dialog).getByLabelText(/why does an admin need to review it/i),
+      'Wrong department',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /update status/i }));
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]![1]!.body))).toMatchObject({
+      status: 'Under Review',
+      note: 'Wrong department',
+    });
+  });
+
   it('closes the dialog with Escape without sending anything', async () => {
     const fetchSpy = mockApi([]);
     renderWithProviders(

@@ -10,8 +10,8 @@ export function EmailStatus({ email }: { email: NotificationDTO['email'] }) {
         ✕ Email failed
       </span>
     );
-  if (email.status === 'pending') return <span className="text-slate-500">Email sending…</span>;
-  return <span className="text-slate-400">In-app only</span>;
+  if (email.status === 'pending') return <span className="text-slate-600">Email sending…</span>;
+  return <span className="text-slate-600">In-app only</span>;
 }
 
 export function NotificationItem({
@@ -37,7 +37,7 @@ export function NotificationItem({
             {!n.read && <span className="sr-only">Unread: </span>}
             {n.message}
           </p>
-          <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-slate-500">
+          <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-slate-600">
             {n.ticket && <span className="font-mono">{n.ticket.ticketId}</span>}
             <span>{relativeTime(n.createdAt)}</span>
             <EmailStatus email={n.email} />

@@ -52,7 +52,7 @@ function FieldShell({ label, error, hint, required, children }: FieldShellProps)
 }
 
 const control =
-  'block w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 ' +
+  'block w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-500 ' +
   'focus:outline-2 focus:outline-offset-0 focus:outline-brand-500 disabled:bg-slate-100';
 const controlState = (invalid: boolean) => (invalid ? 'border-red-500' : 'border-slate-300');
 

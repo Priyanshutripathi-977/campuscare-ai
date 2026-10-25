@@ -65,6 +65,11 @@ export function StatusActions({ ticket, role }: { ticket: TicketDetailDTO; role:
   const close = () => setTarget(null);
 
   const submit = () => {
+    if (target === 'Under Review' && note.trim().length < 5) {
+      return setErrors({
+        note: 'Explain why this ticket needs admin review (at least 5 characters)',
+      });
+    }
     if (target === 'Resolved') {
       const errs: Record<string, string> = {};
       if (note.trim().length < 5)
@@ -121,8 +126,14 @@ export function StatusActions({ ticket, role }: { ticket: TicketDetailDTO; role:
             </Alert>
           )}
           <TextArea
-            label={target === 'Resolved' ? 'Resolution note' : 'Note'}
-            required={target === 'Resolved'}
+            label={
+              target === 'Resolved'
+                ? 'Resolution note'
+                : target === 'Under Review'
+                  ? 'Why does an admin need to review it?'
+                  : 'Note'
+            }
+            required={target === 'Resolved' || target === 'Under Review'}
             rows={3}
             maxLength={500}
             value={note}

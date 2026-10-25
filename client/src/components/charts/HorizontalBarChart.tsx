@@ -8,6 +8,9 @@ export function HorizontalBarChart({ data }: { data: { label: string; value: num
     <div style={{ height }} aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
+          // Charts are hidden from assistive tech (each has a data table instead), so they must not
+          // be keyboard-focusable either — Recharts' keyboard layer would make them focusable.
+          accessibilityLayer={false}
           data={data}
           layout="vertical"
           margin={{ top: 0, right: 24, bottom: 0, left: 0 }}

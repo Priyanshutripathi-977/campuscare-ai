@@ -6,7 +6,9 @@ describe('canTransition', () => {
     expect(canTransition('staff', 'Assigned', 'In Progress')).toBe(true);
     expect(canTransition('staff', 'In Progress', 'Resolved')).toBe(true);
     expect(canTransition('staff', 'Reopened', 'In Progress')).toBe(true);
-    expect(canTransition('staff', 'Assigned', 'Under Review')).toBe(false);
+    expect(canTransition('staff', 'Assigned', 'Under Review')).toBe(true); // send back to admin
+    expect(canTransition('staff', 'Assigned', 'Resolved')).toBe(false);
+    expect(canTransition('staff', 'Resolved', 'Reopened')).toBe(false);
   });
 
   it('never lets anyone skip steps', () => {
