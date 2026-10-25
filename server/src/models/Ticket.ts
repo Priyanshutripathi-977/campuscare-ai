@@ -38,9 +38,35 @@ const ticketSchema = new Schema(
     classification: {
       type: new Schema(
         {
-          source: { type: String, enum: ['admin', 'ai'], required: true },
+          source: { type: String, enum: ['admin', 'ai', 'rules'], required: true },
           by: { type: Schema.Types.ObjectId, ref: 'User', default: null },
           at: { type: Date, required: true },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
+    // AI analysis (a suggestion only). Validated before it is saved here.
+    ai: {
+      type: new Schema(
+        {
+          source: { type: String, enum: ['gemini', 'fallback_rules'], required: true },
+          model: { type: String, default: null },
+          valid: { type: Boolean, required: true },
+          error: { type: String, default: null },
+          category: { type: String, enum: CATEGORIES, required: true },
+          priority: { type: String, enum: PRIORITIES, required: true },
+          confidence: { type: Number, min: 0, max: 1, required: true },
+          summary: { type: String, maxlength: 240 },
+          extractedLocation: { building: String, room: String },
+          keyDetails: [{ type: String, maxlength: 160 }],
+          categoryReason: { type: String, maxlength: 300 },
+          priorityReason: { type: String, maxlength: 300 },
+          needsClarification: { type: Boolean, default: false },
+          clarificationQuestion: { type: String, maxlength: 240, default: null },
+          safetyRisk: { type: Boolean, default: false },
+          recommendedDepartment: { type: Schema.Types.ObjectId, ref: 'Department', default: null },
+          processedAt: { type: Date, required: true },
         },
         { _id: false },
       ),

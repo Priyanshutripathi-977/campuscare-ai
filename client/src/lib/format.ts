@@ -27,6 +27,29 @@ export function formatLocation(loc: { building: string; room?: string; details?:
 
 export const REVIEW_REASON_LABELS: Record<string, string> = {
   awaiting_classification: 'Waiting for category and priority',
+  ai_unavailable: 'AI unavailable — keyword classifier used',
+  low_confidence: 'AI was not confident enough',
+  needs_clarification: 'Waiting for more details from the student',
+  critical_priority: 'Critical — needs human confirmation',
+  review_category: 'Category always reviewed by an admin',
+  no_department_for_category: 'No department mapped to this category',
+  student_category_mismatch: "AI disagrees with the student's category",
   sent_back_for_review: 'Sent back to admin by staff',
-  low_confidence: 'AI was not confident',
 };
+
+export const AI_ERROR_LABELS: Record<string, string> = {
+  not_configured: 'No Gemini API key configured',
+  timeout: 'Gemini did not answer in time',
+  rate_limited: 'Gemini rate limit reached',
+  auth_failed: 'Gemini rejected the API key',
+  provider_unavailable: 'Gemini service unavailable',
+  provider_error: 'Gemini request failed',
+  empty_response: 'Gemini returned an empty answer',
+  invalid_json: 'Gemini returned invalid JSON',
+};
+
+export const aiErrorLabel = (e: string) =>
+  AI_ERROR_LABELS[e] ??
+  (e.startsWith('schema_validation_failed')
+    ? `Gemini answer failed validation (${e.split(': ')[1] ?? ''})`
+    : e);

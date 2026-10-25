@@ -3,6 +3,7 @@
  * The server builds these; the client uses them for type-safe rendering.
  */
 import type { Category, Priority, Role, Status } from './constants';
+import type { RoutingRules } from './ai';
 
 export interface UserDTO {
   id: string;
@@ -44,6 +45,27 @@ export interface TicketSummaryDTO {
   updatedAt: string;
 }
 
+/** AI analysis as shown to staff/admin. Students only receive `clarificationQuestion`. */
+export interface AiAnalysisDTO {
+  source: 'gemini' | 'fallback_rules';
+  model: string | null;
+  valid: boolean;
+  error: string | null;
+  category: Category | null;
+  priority: Priority | null;
+  confidence: number | null;
+  summary: string | null;
+  extractedLocation: { building?: string | null; room?: string | null } | null;
+  keyDetails: string[];
+  categoryReason: string | null;
+  priorityReason: string | null;
+  needsClarification: boolean;
+  clarificationQuestion: string | null;
+  safetyRisk: boolean;
+  recommendedDepartment: { id: string; name: string } | null;
+  processedAt: string;
+}
+
 export interface TicketDetailDTO extends TicketSummaryDTO {
   description: string;
   studentCategory: Category | null;
@@ -53,6 +75,8 @@ export interface TicketDetailDTO extends TicketSummaryDTO {
   hasImage: boolean;
   reviewReasons: string[];
   classification: { source: 'admin' | 'ai'; by: string | null; at: string } | null;
+  /** Full AI analysis for staff/admin; for students only the clarification question (if any). */
+  ai: AiAnalysisDTO | { clarificationQuestion: string | null; needsClarification: boolean } | null;
   routing: { method: 'auto' | 'manual' | 'admin_review'; reason: string; decidedAt: string } | null;
   resolvedAt: string | null;
   statusHistory: StatusHistoryEntry[];
@@ -92,6 +116,11 @@ export interface StatsDTO {
   byPriority: Record<string, number>;
   byDepartment: { name: string; count: number }[];
   createdPerDay: { date: string; count: number }[];
+}
+
+export interface SettingsDTO {
+  slaHours: Record<Priority, number>;
+  routing: RoutingRules;
 }
 
 export interface ApiErrorBody {

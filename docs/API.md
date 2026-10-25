@@ -72,4 +72,4 @@ Submitted → Under Review → (admin assigns) → Assigned → In Progress → 
 
 ## Not implemented yet (planned)
 
-AI classification & automatic routing, duplicate suggestions, notifications, department/settings editors, staff account creation UI.
+Duplicate suggestions, notifications, staff account creation UI.

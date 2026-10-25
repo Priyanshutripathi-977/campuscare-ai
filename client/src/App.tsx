@@ -16,6 +16,9 @@ import { TicketDetailPage } from './pages/TicketDetailPage';
 const DashboardPage = lazy(() =>
   import('./pages/admin/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
+const SettingsPage = lazy(() =>
+  import('./pages/admin/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
 const TicketsPage = lazy(() =>
   import('./pages/admin/TicketsPage').then((m) => ({ default: m.TicketsPage })),
 );
@@ -71,6 +74,14 @@ export default function App() {
           element={
             <RequireAuth roles={['admin', 'staff']}>
               <TicketsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <RequireAuth roles={['admin']}>
+              <SettingsPage />
             </RequireAuth>
           }
         />

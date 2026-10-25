@@ -2,7 +2,7 @@
 
 An agentic campus problem-routing system: students report campus problems, AI classifies and prioritises them, the system routes them to the right department, flags possible duplicates, and tracks every ticket to resolution.
 
-> **Project status:** Student portal, ticket tracking, admin/staff dashboard, login & roles are working end-to-end. AI classification, duplicate detection and notifications are **not built yet** — until then an administrator classifies and routes each complaint. See [PLAN.md](PLAN.md).
+> **Project status:** Student portal, ticket tracking, admin/staff dashboard, login & roles, and **AI complaint understanding + automatic routing** are working. Duplicate detection and notifications are **not built yet**. See [PLAN.md](PLAN.md).
 
 ## Tech stack
 
@@ -89,6 +89,22 @@ npm run dev
 This starts **both** the API server and the React app. Open http://localhost:5173 — the "System status" card should show **API server: Online** and **Database: Connected**.
 
 Stop everything with **Ctrl + C**.
+
+### AI complaint understanding
+
+When a student submits a complaint, the server:
+
+1. **Saves it first** (an AI failure can never lose a complaint).
+2. Asks **Gemini** to classify it (category, priority, confidence, summary, key details, location, short reasons, and whether it needs clarification). Only the complaint text and location are sent — never the student's name or email.
+3. **Validates** the JSON answer with a strict schema (`shared/src/ai.ts`). Invalid answers, API errors and timeouts fall back to a built-in **keyword classifier**, and the reason is recorded.
+4. Applies the **routing rules** (plain code, `server/src/services/routing.service.ts`). A ticket is routed automatically only when the AI is confident enough, the priority is not Critical, the category isn't in the "always review" list, a department is mapped to it, and the student didn't choose a different category. Otherwise it waits in the **review queue** with the reasons listed.
+5. If the complaint is too vague, the student sees a **clarification question**; when they answer with an update, the ticket is analysed again automatically.
+
+Admins change the rules, deadlines and category → department map on the **Settings** page.
+
+**Enabling Gemini:** put your key in `.env` as `GEMINI_API_KEY=...` and restart `npm run dev`. The key is read only by the server; the browser only learns whether AI is configured. Without a key everything still works using the keyword classifier (all complaints then go to admin review).
+
+**Measuring the AI:** `npm run ai:eval -w server` runs 20 labelled complaints (in `server/src/services/ai/evalComplaints.ts`) through the configured classifier and prints accuracy. With a key this makes ~20 Gemini API calls.
 
 ### What you can do in the app
 

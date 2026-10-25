@@ -13,16 +13,18 @@ import {
   TicketQuerySchema,
 } from '@campuscare/shared';
 import type { z } from 'zod';
-import { TicketModel } from '../models/Ticket';
+import { TicketModel, type TicketDoc } from '../models/Ticket';
 import { DepartmentModel } from '../models/Department';
 import { UserModel } from '../models/User';
 import { getSettings } from '../models/Settings';
+import { env } from '../config/env';
+import { getAiProvider } from './ai/provider';
+import { understandComplaint } from './ai/complaintUnderstanding';
+import { decideRouting } from './routing.service';
 import { HttpError } from '../utils/HttpError';
 import { nextTicketId } from '../utils/ticketId';
 import type { StoredImage } from '../middleware/upload';
 import { toTicketDetail, toTicketSummary } from './ticket.dto';
-
-const DEFAULT_SLA_HOURS: Record<Priority, number> = { Critical: 4, High: 24, Medium: 72, Low: 168 };
 
 export type Actor = NonNullable<Express.Request['user']>;
 
@@ -32,6 +34,7 @@ const DETAIL_POPULATE = [
   { path: 'assignedTo', select: 'name' },
   { path: 'statusHistory.by', select: 'name role' },
   { path: 'updates.author', select: 'name role' },
+  { path: 'ai.recommendedDepartment', select: 'name' },
 ];
 
 /** MongoDB filter limiting tickets to what this user may see. */
@@ -74,6 +77,7 @@ interface CreateInput {
 
 export async function createTicket(actor: Actor, input: CreateInput, image: StoredImage | null) {
   const now = new Date();
+  // 1. Save the complaint FIRST, so it is never lost even if the AI step fails.
   const ticket = await TicketModel.create({
     ticketId: await nextTicketId(now),
     student: actor.id,
@@ -82,28 +86,174 @@ export async function createTicket(actor: Actor, input: CreateInput, image: Stor
     location: input.location,
     studentCategory: input.category ?? null,
     image,
-    // AI classification is added in a later milestone. Until then, every new complaint
-    // goes to an administrator, who classifies and routes it manually.
-    status: 'Under Review',
-    needsReview: true,
-    reviewReasons: ['awaiting_classification'],
-    routing: {
-      method: 'admin_review',
-      reason: 'Automatic classification is not enabled yet; an administrator will review it.',
-      decidedAt: now,
-    },
+    status: 'Submitted',
     statusHistory: [
       { from: null, to: 'Submitted', by: actor.id, note: 'Complaint submitted', at: now },
-      {
-        from: 'Submitted',
-        to: 'Under Review',
-        by: null,
-        note: 'Sent to an administrator for classification',
-        at: now,
-      },
     ],
   });
+
+  // 2. Understand + route it.
+  await analyzeAndRoute(ticket);
   return getTicketDetail(actor, ticket.ticketId);
+}
+
+/**
+ * Runs the AI pipeline on a ticket and applies the routing policy.
+ * Only tickets that are not yet with a department are (re)routed.
+ */
+export async function analyzeAndRoute(
+  ticket: TicketDoc,
+  trigger: 'submitted' | 'clarified' | 'rerun' = 'submitted',
+) {
+  const from = ticket.status as Status;
+  const now = new Date();
+  try {
+    const followUps = ticket.updates
+      .filter((u) => u.authorRole === 'student')
+      .map((u) => u.message);
+    const [ai, settings, departments] = await Promise.all([
+      understandComplaint(
+        {
+          title: ticket.title,
+          description: ticket.description,
+          location: {
+            building: ticket.location?.building ?? '',
+            room: ticket.location?.room,
+            details: ticket.location?.details,
+          },
+          studentCategory: ticket.studentCategory as Category | null,
+          followUps,
+        },
+        getAiProvider(),
+        { timeoutMs: env.AI_TIMEOUT_MS },
+      ),
+      getSettings(),
+      DepartmentModel.find({ active: true }, 'name categories').lean(),
+    ]);
+
+    const decision = decideRouting({
+      ai,
+      studentCategory: ticket.studentCategory as Category | null,
+      rules: settings.routing,
+      departments: departments.map((d) => ({
+        id: String(d._id),
+        name: d.name,
+        categories: d.categories as Category[],
+      })),
+    });
+
+    // Store the validated analysis (suggestion) on the ticket.
+    ticket.ai = {
+      ...ai,
+      extractedLocation: {
+        building: ai.extractedLocation?.building ?? undefined,
+        room: ai.extractedLocation?.room ?? undefined,
+      },
+      clarificationQuestion: ai.clarificationQuestion ?? null,
+      recommendedDepartment: (decision.recommendedDepartment?.id ??
+        null) as unknown as Types.ObjectId,
+    };
+    // Suggested category/priority are shown (and start the deadline clock) but only an
+    // auto-route or an admin action actually sends the ticket to a department.
+    ticket.category = ai.category;
+    ticket.priority = ai.priority;
+    ticket.priorityRank = PRIORITY_RANK[ai.priority];
+    ticket.classification = { source: ai.source === 'gemini' ? 'ai' : 'rules', by: null, at: now };
+    ticket.dueAt = new Date(ticket.createdAt.getTime() + settings.slaHours[ai.priority] * 3600_000);
+
+    const label =
+      trigger === 'submitted'
+        ? ''
+        : trigger === 'clarified'
+          ? ' (after student added details)'
+          : ' (re-run by admin)';
+    if (decision.autoRoute && decision.recommendedDepartment) {
+      ticket.status = 'Assigned';
+      ticket.department = decision.recommendedDepartment.id as unknown as Types.ObjectId;
+      ticket.needsReview = false;
+      ticket.reviewReasons = [];
+      ticket.routing = {
+        method: 'auto',
+        decidedBy: null,
+        reason: decision.explanation,
+        decidedAt: now,
+      };
+      ticket.statusHistory.push({
+        from,
+        to: 'Assigned',
+        by: null,
+        note: `Automatically routed to ${decision.recommendedDepartment.name}${label}`,
+        at: now,
+      });
+    } else {
+      ticket.status = 'Under Review';
+      ticket.needsReview = true;
+      ticket.reviewReasons = decision.reviewReasons;
+      ticket.routing = {
+        method: 'admin_review',
+        decidedBy: null,
+        reason: decision.explanation,
+        decidedAt: now,
+      };
+      if (from !== 'Under Review') {
+        ticket.statusHistory.push({
+          from,
+          to: 'Under Review',
+          by: null,
+          note: ai.needsClarification
+            ? 'More details needed — see the question on this ticket'
+            : `Sent to an administrator for review${label}`,
+          at: now,
+        });
+      }
+    }
+    await ticket.save();
+  } catch (err) {
+    // Unexpected failure (e.g. database hiccup): never lose the ticket — send it to a human.
+    console.error('[ai] analyzeAndRoute failed:', err);
+    await TicketModel.updateOne(
+      { _id: ticket._id, status: from },
+      {
+        $set: {
+          status: 'Under Review',
+          needsReview: true,
+          reviewReasons: ['ai_unavailable'],
+          routing: {
+            method: 'admin_review',
+            decidedBy: null,
+            reason: 'Automatic analysis failed; an administrator will review it.',
+            decidedAt: now,
+          },
+        },
+        ...(from !== 'Under Review'
+          ? {
+              $push: {
+                statusHistory: {
+                  from,
+                  to: 'Under Review',
+                  by: null,
+                  note: 'Sent to an administrator for review',
+                  at: now,
+                },
+              },
+            }
+          : {}),
+      },
+    );
+  }
+}
+
+/** Admin action: run the AI again (only for tickets still waiting in review). */
+export async function rerunAnalysis(actor: Actor, ticketId: string) {
+  const ticket = await findVisibleTicket(actor, ticketId);
+  if (ticket.status !== 'Under Review' && ticket.status !== 'Submitted') {
+    throw new HttpError(
+      409,
+      'AI analysis can only be re-run for tickets that are still under review',
+    );
+  }
+  await analyzeAndRoute(ticket, 'rerun');
+  return getTicketDetail(actor, ticketId);
 }
 
 // ---------- List ----------
@@ -163,6 +313,15 @@ export async function addUpdate(actor: Actor, ticketId: string, message: string)
   const ticket = await findVisibleTicket(actor, ticketId);
   ticket.updates.push({ author: actor.id, authorRole: actor.role, message, at: new Date() });
   await ticket.save();
+
+  // If we asked the student for more details and they answered, analyse the ticket again.
+  if (
+    actor.role === 'student' &&
+    ticket.status === 'Under Review' &&
+    ticket.ai?.needsClarification
+  ) {
+    await analyzeAndRoute(ticket, 'clarified');
+  }
   return getTicketDetail(actor, ticketId);
 }
 
@@ -241,9 +400,19 @@ export async function classifyTicket(
   ticket.priorityRank = PRIORITY_RANK[priority];
   ticket.classification = { source: 'admin', by: actor.id as unknown as Types.ObjectId, at: now };
   // Deadline counts from when the complaint was submitted, not when it was classified.
-  const slaHours = settings.slaHours?.[priority] ?? DEFAULT_SLA_HOURS[priority];
-  ticket.dueAt = new Date(ticket.createdAt.getTime() + slaHours * 3600_000);
-  ticket.reviewReasons = ticket.reviewReasons.filter((r) => r !== 'awaiting_classification');
+  ticket.dueAt = new Date(ticket.createdAt.getTime() + settings.slaHours[priority] * 3600_000);
+  // The admin has now confirmed the category/priority, so AI-related doubts are resolved.
+  ticket.reviewReasons = ticket.reviewReasons.filter(
+    (r) =>
+      ![
+        'awaiting_classification',
+        'low_confidence',
+        'ai_unavailable',
+        'student_category_mismatch',
+        'critical_priority',
+        'review_category',
+      ].includes(r),
+  );
   await ticket.save();
   return getTicketDetail(actor, ticketId);
 }

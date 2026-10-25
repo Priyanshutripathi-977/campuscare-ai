@@ -22,6 +22,7 @@ export const ticketFixture = (overrides: Partial<TicketDetailDTO> = {}): TicketD
   hasImage: false,
   reviewReasons: [],
   classification: null,
+  ai: null,
   routing: null,
   resolvedAt: null,
   statusHistory: [{ from: null, to: 'Submitted', by: null, at: new Date().toISOString() }],

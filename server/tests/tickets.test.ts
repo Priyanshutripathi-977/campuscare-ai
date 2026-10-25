@@ -66,11 +66,15 @@ describe('creating complaints', () => {
     expect(a.status).toBe(201);
     expect(a.body.ticket.ticketId).toMatch(/^CC-\d{4}-\d{6}$/);
     expect(a.body.ticket.ticketId).not.toBe(b.body.ticket.ticketId);
+    // No AI key in tests → rule-based suggestion, which always goes to an administrator.
     expect(a.body.ticket).toMatchObject({
       status: 'Under Review',
       needsReview: true,
-      category: null,
+      category: 'Electrical',
     });
+    expect(a.body.ticket.reviewReasons).toEqual([]); // internal reasons are hidden from students
+    const adminView = await admin.get(`/api/tickets/${a.body.ticket.ticketId}`);
+    expect(adminView.body.ticket.reviewReasons).toContain('ai_unavailable');
     expect(a.body.ticket.statusHistory.map((h: { to: string }) => h.to)).toEqual([
       'Submitted',
       'Under Review',
@@ -188,6 +192,8 @@ describe('classification, assignment and status workflow', () => {
   it('requires classification before assignment, then sets a deadline', async () => {
     const { body } = await submit(student);
     const id = body.ticket.ticketId;
+    // Simulate a ticket with no classification at all (e.g. the analysis step crashed).
+    await TicketModel.updateOne({ ticketId: id }, { category: null, priority: null });
     const early = await admin.patch(`/api/tickets/${id}/assign`).send({ departmentId: elecDeptId });
     expect(early.status).toBe(409);
 
@@ -323,8 +329,8 @@ describe('admin endpoints', () => {
     const all = (await admin.get('/api/admin/stats')).body.stats;
     expect(all).toMatchObject({ scope: 'all', total: 2, open: 2, needsReview: 1 });
     expect(all.byStatus.Assigned).toBe(1);
-    expect(all.byCategory.Electrical).toBe(1);
-    expect(all.byCategory.Unclassified).toBe(1);
+    expect(all.byCategory.Electrical).toBe(2); // one confirmed by admin, one rules suggestion
+    expect(all.byCategory.Unclassified).toBeUndefined();
     expect(all.createdPerDay).toHaveLength(14);
     expect(all.createdPerDay.at(-1).count).toBe(2);
 
