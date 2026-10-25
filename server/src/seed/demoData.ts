@@ -12,7 +12,12 @@ import { TicketModel } from '../models/Ticket';
 import { getSettings } from '../models/Settings';
 import { nextTicketId } from '../utils/ticketId';
 import { DuplicateSuggestionModel } from '../models/DuplicateSuggestion';
+import { NotificationModel } from '../models/Notification';
+import { deleteStoredImage } from '../middleware/upload';
 import { detectDuplicates } from '../services/duplicate.service';
+import { analyzeAndRoute } from '../services/ticket.service';
+import { understandComplaint } from '../services/ai/complaintUnderstanding';
+import { setAiProvider } from '../services/ai/provider';
 
 /** Demo-only password for every demo account. Never use this for real accounts. */
 export const DEMO_PASSWORD = 'Demo@1234';
@@ -187,6 +192,17 @@ const DEMO_TICKETS: DemoTicket[] = [
     status: 'Under Review',
     daysAgo: 0,
   },
+  // Deliberately vague: the classifier asks Neha a clarification question (demo of that feature).
+  {
+    student: 1,
+    title: 'Something is broken again',
+    description: 'It stopped working again last night. Please send someone soon.',
+    building: 'Girls Hostel',
+    category: null,
+    priority: null,
+    status: 'Under Review',
+    daysAgo: 0,
+  },
   {
     student: 1,
     title: 'Garbage pile near parking area',
@@ -235,12 +251,41 @@ export interface SeedResult {
 
 export async function seedDemoData({ reset = false } = {}): Promise<SeedResult> {
   if (reset) {
-    // Only removes records flagged as demo data — real data is never touched.
-    const demoIds = await TicketModel.find({ isDemo: true }).distinct('_id');
+    // Removes ONLY demo data: demo tickets, demo accounts, and everything those accounts created
+    // while practising (their tickets, photos, notifications, duplicate suggestions).
+    // Tickets and accounts of real users are never deleted.
+    const demoUserIds = await UserModel.find({ isDemo: true }).distinct('_id');
+    const existingUserIds = await UserModel.find({ isDemo: { $ne: true } }).distinct('_id');
+    const toDelete = await TicketModel.find(
+      {
+        $or: [
+          { isDemo: true },
+          { student: { $in: demoUserIds } },
+          // Left behind by older versions of --reset: their (demo) student no longer exists.
+          { student: { $nin: [...demoUserIds, ...existingUserIds] } },
+        ],
+      },
+      '_id image',
+    ).lean();
+    const ticketIds = toDelete.map((t) => t._id);
+
     await DuplicateSuggestionModel.deleteMany({
-      $or: [{ ticket: { $in: demoIds } }, { candidate: { $in: demoIds } }],
+      $or: [{ ticket: { $in: ticketIds } }, { candidate: { $in: ticketIds } }],
     });
-    await TicketModel.deleteMany({ isDemo: true });
+    await NotificationModel.deleteMany({
+      $or: [
+        { ticket: { $in: ticketIds } },
+        { user: { $in: demoUserIds } },
+        { user: { $nin: [...demoUserIds, ...existingUserIds] } },
+      ],
+    });
+    for (const t of toDelete) if (t.image?.filename) await deleteStoredImage(t.image.filename);
+    await TicketModel.deleteMany({ _id: { $in: ticketIds } });
+    // Real tickets that were assigned to a demo staff member go back to "anyone in the department".
+    await TicketModel.updateMany(
+      { assignedTo: { $in: demoUserIds } },
+      { $set: { assignedTo: null } },
+    );
     await UserModel.deleteMany({ isDemo: true });
   }
 
@@ -402,6 +447,43 @@ export async function seedDemoData({ reset = false } = {}): Promise<SeedResult> 
       createdAt,
       updatedAt: history.at(-1)!.at,
     });
+  }
+
+  // Give every demo ticket a REAL analysis from the built-in keyword classifier — the same code
+  // that runs for a real submission when no Gemini key is configured. (Gemini is switched off
+  // here on purpose so the demo looks the same on every computer.)
+  setAiProvider(null);
+  try {
+    const departments = await DepartmentModel.find({ active: true }, 'categories').lean();
+    for (const t of await TicketModel.find({ isDemo: true }).sort({ createdAt: 1 })) {
+      if (t.status === 'Under Review' && !t.department) {
+        // Waiting tickets: run the full pipeline (analysis + routing rules), like a new complaint.
+        await analyzeAndRoute(t);
+      } else {
+        // Already handled by an admin: attach the analysis, keep the admin's decision.
+        const ai = await understandComplaint(
+          {
+            title: t.title,
+            description: t.description,
+            location: { building: t.location?.building ?? '', room: t.location?.room },
+          },
+          null,
+        );
+        const dept = departments.find((d) => (d.categories as string[]).includes(ai.category));
+        t.ai = {
+          ...ai,
+          extractedLocation: {
+            building: ai.extractedLocation?.building ?? undefined,
+            room: ai.extractedLocation?.room ?? undefined,
+          },
+          clarificationQuestion: ai.clarificationQuestion ?? null,
+          recommendedDepartment: dept?._id ?? null,
+        };
+        await t.save();
+      }
+    }
+  } finally {
+    setAiProvider(undefined); // back to normal (Gemini if a key is configured)
   }
 
   // Run real duplicate detection over the demo tickets (oldest first, like real submissions).

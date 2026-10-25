@@ -2,7 +2,7 @@
 
 Status as of **25 Oct 2026**, branch `fix/audit` (includes PRs #1–#4 and the audit fixes in section 5).
 
-**Automated checks:** 389 tests pass (353 server, 36 client). Typecheck, lint and the production build are clean.
+**Automated checks:** 392 tests pass (356 server, 36 client). Typecheck, lint and the production build are clean.
 
 What "Verified" means in this document:
 
@@ -86,16 +86,16 @@ What "Verified" means in this document:
 
 ### Security
 
-| Feature                                                                                            | Verified                                                          |
-| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Role and ownership checks on **every endpoint × 6 kinds of user** (136 cases)                      | Auto (`authorization.test.ts`)                                    |
-| Server-side validation of every input; database operators rejected; 413/415 for malformed bodies   | Auto (`validation.test.ts`, 54 cases)                             |
-| Photo checks by file content, size limit, random names, private serving                            | Auto (`tickets.test.ts`)                                          |
-| Rate limiting on login                                                                             | Auto (`auth.test.ts`)                                             |
-| Same error for unknown email and wrong password; forged tokens rejected; deleted users lose access | Auto                                                              |
-| Placeholder `JWT_SECRET` from `.env.example` refused at startup                                    | Manual (started the server with it: refused with a clear message) |
-| No stack traces or internals in error responses                                                    | Auto                                                              |
-| Dashboards show counts only; staff don't see student emails                                        | Auto (`tickets.test.ts`)                                          |
+| Feature                                                                                                             | Verified                                                          |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Role and ownership checks on **every endpoint × 6 kinds of user** (22 × 6 = 132 cases, plus 5 role-tampering tests) | Auto (`authorization.test.ts`)                                    |
+| Server-side validation of every input; database operators rejected; 413/415 for malformed bodies                    | Auto (`validation.test.ts`, 54 cases)                             |
+| Photo checks by file content, size limit, random names, private serving                                             | Auto (`tickets.test.ts`)                                          |
+| Rate limiting on login                                                                                              | Auto (`auth.test.ts`)                                             |
+| Same error for unknown email and wrong password; forged tokens rejected; deleted users lose access                  | Auto                                                              |
+| Placeholder `JWT_SECRET` from `.env.example` refused at startup                                                     | Manual (started the server with it: refused with a clear message) |
+| No stack traces or internals in error responses                                                                     | Auto                                                              |
+| Dashboards show counts only; staff don't see student emails                                                         | Auto (`tickets.test.ts`)                                          |
 
 ---
 
@@ -175,3 +175,33 @@ Resolve and reopen were not repeated by hand in this run; they are covered by `j
 - student: My complaints, Report a problem (including with errors showing), confirmation, ticket page, Notifications;
 - staff: dashboard and ticket page;
 - admin: dashboard, all tickets, review queue, ticket page, Duplicates, Settings, Notifications.
+
+---
+
+## 6. Documented commands: verified 25 Oct 2026
+
+Run on macOS 26 (Apple M4), Node 20.20.2, npm 11.21.1, MongoDB 9.0 (Homebrew). Exit code 0 = success.
+
+| Command (as written in README / DEMO / API docs)                                                                                                                                                 | Result                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node -v` / `npm -v`                                                                                                                                                                             | v20.20.2 / 11.21.1                                                                                                                                                                                                       |
+| `brew services list` (MongoDB)                                                                                                                                                                   | `mongodb-community started`                                                                                                                                                                                              |
+| `npm install`                                                                                                                                                                                    | exit 0 ("up to date"); a fresh install on a clean copy was also verified during the final-documentation step                                                                                                             |
+| `cp .env.example .env` with the placeholder secret left in                                                                                                                                       | Server **refuses to start** with a clear JWT_SECRET message (intended)                                                                                                                                                   |
+| `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`                                                                                                                       | 96-character secret                                                                                                                                                                                                      |
+| `npm run typecheck` / `npm run lint` / `npm run format`                                                                                                                                          | exit 0 / exit 0 / exit 0 (no changes needed)                                                                                                                                                                             |
+| `npm test`                                                                                                                                                                                       | exit 0: 356 server + 36 client tests pass                                                                                                                                                                                |
+| `npm run build`                                                                                                                                                                                  | exit 0                                                                                                                                                                                                                   |
+| `npm run seed -w server` / `npm run seed -w server -- --reset`                                                                                                                                   | exit 0: 7 departments, 9 accounts, 15 tickets, 1 duplicate suggestion. After the reset fix, the database holds exactly the 15 demo tickets and **0** tickets or notifications pointing at deleted users (`seed.test.ts`) |
+| `npm run ai:eval -w server`                                                                                                                                                                      | exit 0: keyword fallback 20/20 category, 20/20 priority, 2/2 vague flagged (no Gemini key)                                                                                                                               |
+| `npm run dev` + `curl -s http://localhost:4000/api/health`                                                                                                                                       | `{"status":"ok","database":"connected","aiConfigured":false,…}`                                                                                                                                                          |
+| `bash scripts/api-walkthrough.sh`                                                                                                                                                                | Full flow OK. Security checks returned 403 / 404 / 401 as expected                                                                                                                                                       |
+| Demo script claims (classifier output for the demo complaint, the scanner override at 38%, Neha's clarification question, the chemistry-smell example, the 81% duplicate pair, quoted UI labels) | Checked against the code, the database and the running app                                                                                                                                                               |
+
+**Not verified:**
+
+- `brew install …` (MongoDB was already installed earlier in the project).
+- The Windows/Linux notes.
+- Commands that need your credentials: a real `GEMINI_API_KEY`, real SMTP settings.
+
+**Bug found while verifying (fixed):** `--reset` deleted the demo accounts but not the tickets and notifications those accounts had created while practising. That left 4 tickets and 8 notifications pointing at users that no longer existed. The reset now removes everything created with demo accounts (tickets, photos, notifications, duplicate suggestions) and unassigns demo staff from real tickets. Real users' data is kept, as `seed.test.ts` proves.
