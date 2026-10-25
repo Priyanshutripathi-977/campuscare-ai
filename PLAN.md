@@ -1,6 +1,6 @@
 # CampusCare AI — Implementation Plan
 
-> Status: **DRAFT — awaiting approval.** No application code has been written yet.
+> Status: **Implemented** (Oct 2026). This is the original plan, kept for reference. Sections 1–10 describe what was _planned_; [section 11](#11-changes-from-the-original-plan) lists what changed during the build. For what actually works today see [docs/CHECKLIST.md](docs/CHECKLIST.md); for the real API see [docs/API.md](docs/API.md).
 
 ---
 
@@ -387,3 +387,39 @@ After each milestone I'll stop, report what was built + test results, and explai
 2. **Gemini API key** — do you have one (free from Google AI Studio)? Not required to start; the app works with the rule-based fallback and I'll mock Gemini in tests.
 3. **Email notifications** — attempt SMTP (e.g. a Gmail app password) in M8, or keep in-app only? Telegram I'd skip unless you specifically want it.
 4. **"Closed" status** — keep Resolved as final (as specified), or add Closed?
+
+**Decisions taken:** local MongoDB via Homebrew; no Gemini key yet (keyword fallback); in-app notifications with optional SMTP email; Resolved is the final status (no "Closed").
+
+---
+
+## 11. Changes from the original plan
+
+| Area                   | Planned                                     | What was built                                                                                           | Why                                                                         |
+| ---------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Milestone order        | M0 → M10 one after another                  | Frontend milestone built together with auth, tickets and stats backend                                   | No placeholder buttons: the screens needed a real backend (your choice)     |
+| Department API         | `/api/departments`                          | `/api/admin/departments`                                                                                 | All admin and staff tools live under one protected router                   |
+| Review queue           | `GET /admin/review-queue`                   | `GET /tickets?needsReview=true`                                                                          | Reuses the ticket list with its filters, search and pagination              |
+| Re-run AI              | `POST /tickets/:id/reclassify`              | `POST /tickets/:id/reanalyze` (only while Under Review)                                                  | Prevents moving tickets that a department is already working on             |
+| Staff accounts         | `GET/POST /admin/users`                     | Only `GET /admin/staff` (for assignment); staff are created by the seed                                  | Not needed for the demo; listed as remaining work (L5)                      |
+| New tickets without AI | —                                           | Rule-based suggestion + always admin review                                                              | So that missing or failed AI never routes anything automatically            |
+| AI output fields       | as planned                                  | Added `safetyRisk`; recommended department derived from the admin's map, not from the AI                 | The department must follow configurable rules, not model output             |
+| Ticket field           | `classification` source admin / ai          | admin / ai / **rules**                                                                                   | Honest about where a suggestion came from                                   |
+| Duplicates             | TF-IDF; embeddings maybe                    | TF-IDF with place words removed + location and category, ×0.7 for a different building; each pair once   | Free, offline and explainable; fixes double-counting found in testing       |
+| Settings               | `duplicateThreshold`, `duplicateWindowDays` | `settings.duplicates.{threshold, windowDays}` and `settings.routing.{…}`                                 | Grouped and validated as a whole                                            |
+| Notifications          | Email or Telegram if feasible               | In-app + optional SMTP email with the real delivery status; **no Telegram**                              | Email covers the need; Telegram would need a bot setup per user             |
+| Real-time              | —                                           | Polling every 30 s                                                                                       | Simpler than WebSockets; enough for a help desk                             |
+| Status set             | Six statuses, maybe "Closed"                | Six statuses; **Resolved is final**                                                                      | Your decision                                                               |
+| Tests                  | Optional Playwright E2E                     | Not done; covered by API integration tests, UI component tests and manual browser runs                   | Time; listed as remaining work                                              |
+| Server build           | —                                           | Server runs with `tsx` (no compile step)                                                                 | Simpler for a student project; listed under deployment                      |
+| Toolchain              | Latest packages                             | Pinned versions that support Node 20 (vitest 4, jsdom 29, react-router 7, file-type 21); npm 11 required | Several latest packages require Node 22; npm 10.8 crashes on this workspace |
+
+### Bugs found and fixed along the way (worth mentioning in a report)
+
+- Production builds used React's development mode (Vite `loadEnv` picked up `NODE_ENV` from `.env`).
+- Login didn't stick: the cache was cleared while the app was still watching it. Later, a slow first session check could overwrite a fresh login (race condition).
+- After login, the app ignored the page you'd originally asked for.
+- Oversized or unsupported request bodies returned 500 instead of 413/415.
+- Duplicate pairs were suggested in both directions; the room number was counted twice in the score.
+- The keyword classifier was fooled by "URGENT" and "these days", and missed water dripping onto a switchboard.
+- The notification panel was cut off on phones.
+- `.env.example` had an `APP_URL=` line that stopped a fresh setup from starting, and its placeholder `JWT_SECRET` was accepted as a real secret.
