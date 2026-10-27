@@ -77,7 +77,28 @@ describe('AI routing on submission', () => {
       recommendedDepartment: { name: 'Electrical Maintenance' },
     });
     // …students do not.
-    expect(t.ai).toBeNull();
+    // …students get only a plain summary + suggestion for their own complaint.
+    expect(t.ai).toEqual({
+      view: 'student',
+      source: 'gemini',
+      summary: 'Ceiling fan in room 101 is not working.',
+      category: 'Electrical',
+      priority: 'High',
+      recommendedDepartment: { id: elecId, name: 'Electrical Maintenance' },
+      needsClarification: false,
+      clarificationQuestion: null,
+    });
+    for (const internal of [
+      'confidence',
+      'categoryReason',
+      'priorityReason',
+      'error',
+      'valid',
+      'model',
+      'keyDetails',
+    ]) {
+      expect(t.ai).not.toHaveProperty(internal);
+    }
     expect(t.routing).toBeNull();
   });
 
@@ -151,7 +172,8 @@ describe('clarification flow', () => {
     setAiProvider(provider);
     const t = (await submit()).body.ticket;
     expect(t.status).toBe('Under Review');
-    expect(t.ai).toEqual({
+    expect(t.ai).toMatchObject({
+      view: 'student',
       needsClarification: true,
       clarificationQuestion: 'Which room is the fan in?',
     });
@@ -170,7 +192,7 @@ describe('clarification flow', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]!.followUps).toEqual(['It is in room 101, second fan from the door.']);
     expect(answered.status).toBe('Assigned');
-    expect(answered.ai).toBeNull(); // the question is gone
+    expect(answered.ai).toMatchObject({ needsClarification: false, clarificationQuestion: null }); // the question is gone
     expect(answered.statusHistory.at(-1).note).toMatch(/after student added details/);
   });
 });

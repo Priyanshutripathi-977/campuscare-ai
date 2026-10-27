@@ -43,6 +43,14 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
     byCategory: Bucket[];
     byPriority: Bucket[];
     byDepartment: Bucket[];
+    openByPriority: Bucket[];
+    deptPerformance: {
+      _id: unknown;
+      open: number;
+      resolved: number;
+      overdue: number;
+      avgMs: number | null;
+    }[];
     overdue: { count: number }[];
     needsReview: { count: number }[];
     resolution: { avgMs: number | null }[];
@@ -55,6 +63,46 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
         byCategory: [{ $group: { _id: '$category', count: { $sum: 1 } } }],
         byPriority: [{ $group: { _id: '$priority', count: { $sum: 1 } } }],
         byDepartment: [{ $group: { _id: '$department', count: { $sum: 1 } } }],
+        openByPriority: [
+          { $match: { status: { $ne: 'Resolved' } } },
+          { $group: { _id: '$priority', count: { $sum: 1 } } },
+        ],
+        // Workload + speed per department (tickets not yet assigned are left out).
+        deptPerformance: [
+          { $match: { department: { $ne: null } } },
+          {
+            $group: {
+              _id: '$department',
+              open: { $sum: { $cond: [{ $ne: ['$status', 'Resolved'] }, 1, 0] } },
+              resolved: { $sum: { $cond: [{ $eq: ['$status', 'Resolved'] }, 1, 0] } },
+              overdue: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ['$status', 'Resolved'] },
+                        { $gt: ['$dueAt', null] }, // has a deadline (dates sort above null)
+                        { $lt: ['$dueAt', now] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+              // $avg ignores nulls, so only resolved tickets with a resolve time count.
+              avgMs: {
+                $avg: {
+                  $cond: [
+                    { $and: [{ $eq: ['$status', 'Resolved'] }, { $gt: ['$resolvedAt', null] }] },
+                    { $subtract: ['$resolvedAt', '$createdAt'] },
+                    null,
+                  ],
+                },
+              },
+            },
+          },
+        ],
         overdue: [
           { $match: { status: { $ne: 'Resolved' }, dueAt: { $ne: null, $lt: now } } },
           { $count: 'count' },
@@ -82,7 +130,10 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
   const resolved = byStatus.Resolved ?? 0;
 
   // Department ids → names (null = not yet assigned).
-  const deptIds = facets!.byDepartment.map((b) => b._id).filter(Boolean);
+  const deptIds = [
+    ...facets!.byDepartment.map((b) => b._id),
+    ...facets!.deptPerformance.map((d) => d._id),
+  ].filter(Boolean);
   const depts = await DepartmentModel.find({ _id: { $in: deptIds } }, 'name').lean();
   const deptName = new Map(depts.map((d) => [String(d._id), d.name]));
   const byDepartment = facets!.byDepartment
@@ -100,6 +151,18 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
     const key = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(d); // YYYY-MM-DD
     return { date: key, count: perDayMap.get(key) ?? 0 };
   });
+
+  const toHours = (ms: number | null | undefined) =>
+    ms === null || ms === undefined ? null : Math.round((ms / 3600_000) * 10) / 10;
+  const departmentPerformance = facets!.deptPerformance
+    .map((d) => ({
+      name: deptName.get(String(d._id)) ?? 'Unknown',
+      open: d.open,
+      resolved: d.resolved,
+      overdue: d.overdue,
+      avgResolutionHours: toHours(d.avgMs),
+    }))
+    .sort((a, b) => b.open + b.resolved - (a.open + a.resolved));
 
   const avgMs = facets!.resolution[0]?.avgMs ?? null;
   const pendingDuplicates =
@@ -119,6 +182,8 @@ export async function getStats(actor: Actor, now = new Date()): Promise<StatsDTO
     byCategory: toRecord(facets!.byCategory, CATEGORIES, 'Unclassified'),
     byPriority: toRecord(facets!.byPriority, PRIORITIES, 'Unassessed'),
     byDepartment,
+    openByPriority: toRecord(facets!.openByPriority, PRIORITIES, 'Unassessed'),
+    departmentPerformance,
     createdPerDay,
   };
 }

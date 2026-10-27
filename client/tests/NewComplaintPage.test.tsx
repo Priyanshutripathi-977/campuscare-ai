@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NewComplaintPage } from '../src/pages/student/NewComplaintPage';
 import { jsonResponse, mockApi, renderWithProviders, studentUser } from './renderWithProviders';
@@ -85,5 +85,34 @@ describe('NewComplaintPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/some fields are invalid/i);
     expect(screen.getByText(/must be a JPG, PNG or WebP/i)).toBeInTheDocument();
+  });
+});
+
+describe('NewComplaintPage — double submission (regression: audit B6)', () => {
+  it('two submits in the same instant send only ONE complaint, and fields are disabled while sending', async () => {
+    let answer!: (r: Response) => void;
+    const spy = mockApi([['/api/tickets', () => new Promise<Response>((r) => (answer = r))]]);
+    setup();
+    await userEvent.type(screen.getByLabelText(/short title/i), 'Fan not working');
+    await userEvent.type(
+      screen.getByLabelText(/description/i),
+      'The ceiling fan in room 101 is not working at all.',
+    );
+    await userEvent.type(screen.getByLabelText(/building/i), 'Main Building');
+
+    const form = screen.getByLabelText(/short title/i).closest('form')!;
+    fireEvent.submit(form);
+    fireEvent.submit(form); // e.g. a double-click / double Enter before the screen updates
+    expect(await screen.findByText(/submitting and analysing/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/short title/i)).toBeDisabled();
+    expect(spy.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+
+    answer(
+      jsonResponse(
+        { ticket: ticketFixture({ ticketId: 'CC-2026-000077', status: 'Under Review' }) },
+        201,
+      ),
+    );
+    expect(await screen.findByText('CC-2026-000077')).toBeInTheDocument();
   });
 });

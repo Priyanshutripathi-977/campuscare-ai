@@ -13,7 +13,7 @@ export function SystemStatus() {
 
   return (
     <Card>
-      <h2 className="text-base font-semibold">System status</h2>
+      <h2 className="text-sm font-semibold text-navy-900">System status</h2>
       <div className="mt-4">
         {isPending && <Spinner label="Checking server…" />}
 

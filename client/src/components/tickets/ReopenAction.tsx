@@ -8,9 +8,11 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { TextArea } from '../ui/Field';
 import { Alert } from '../ui/Alert';
+import { useToast } from '../ui/Toast';
 
 export function ReopenAction({ ticket }: { ticket: TicketDetailDTO }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string>();
@@ -18,6 +20,11 @@ export function ReopenAction({ ticket }: { ticket: TicketDetailDTO }) {
   const mutation = useMutation({
     mutationFn: (r: string) => reopenTicket(ticket.ticketId, r),
     onSuccess: (updated) => {
+      toast({
+        tone: 'success',
+        title: 'Ticket reopened',
+        description: 'The department has been notified.',
+      });
       queryClient.setQueryData(['ticket', ticket.ticketId], updated);
       void queryClient.invalidateQueries({ queryKey: ['tickets'] });
       setOpen(false);

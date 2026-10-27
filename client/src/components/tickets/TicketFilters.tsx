@@ -21,7 +21,7 @@ const SORT_LABELS: Record<(typeof TICKET_SORTS)[number], string> = {
 };
 
 const selectCls =
-  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-brand-500';
+  'h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm text-navy-800 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/25';
 
 interface Props {
   showAdminFilters?: boolean;
@@ -42,7 +42,7 @@ export function TicketFilters({ showAdminFilters = false, departments = [] }: Pr
   const active = [...params.keys()].some((k) => k !== 'page' && k !== 'sort');
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+    <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card">
       {/* key= resets the box when the URL's search changes (e.g. browser back button). */}
       <SearchBox
         key={params.get('q') ?? ''}
@@ -148,7 +148,7 @@ function SearchBox({ initial, onSearch }: { initial: string; onSearch: (q: strin
         onChange={(e) => setSearch(e.target.value)}
         maxLength={100}
         placeholder="Search by title, ticket ID or building…"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-2 focus:outline-brand-500"
+        className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm text-navy-900 placeholder:text-slate-500 hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/25"
       />
       <Button type="submit" variant="secondary">
         Search
@@ -195,7 +195,7 @@ function Toggle({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm has-checked:border-brand-500 has-checked:bg-brand-50">
+    <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm text-navy-800 transition-colors hover:border-slate-300 has-checked:border-brand-500 has-checked:bg-brand-50 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-500/25">
       <input
         type="checkbox"
         className="accent-brand-600"

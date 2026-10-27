@@ -9,9 +9,9 @@ import { aiErrorLabel, formatDateTime } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
 import { TagBadge } from './Badges';
+import { Tooltip } from '../ui/Tooltip';
 
-export const isFullAi = (ai: TicketDetailDTO['ai']): ai is AiAnalysisDTO =>
-  Boolean(ai && 'source' in ai);
+export const isFullAi = (ai: TicketDetailDTO['ai']): ai is AiAnalysisDTO => ai?.view === 'full';
 
 export function AiAnalysisCard({
   ticket,
@@ -43,7 +43,22 @@ export function AiAnalysisCard({
             <TagBadge tone={ai.source === 'gemini' ? 'violet' : 'slate'}>
               {ai.source === 'gemini' ? `Gemini · ${ai.model}` : 'Keyword fallback'}
             </TagBadge>
-            {ai.confidence !== null && <ConfidenceMeter value={ai.confidence} />}
+            {ai.confidence !== null && (
+              <Tooltip
+                label={
+                  ai.source === 'gemini'
+                    ? 'How sure Gemini was about the category. Below the threshold in Settings, a person decides.'
+                    : 'A rough keyword-match estimate (capped at 60%), not an AI score.'
+                }
+              >
+                <span
+                  tabIndex={0}
+                  className="rounded focus-visible:outline-2 focus-visible:outline-brand-600"
+                >
+                  <ConfidenceMeter value={ai.confidence} />
+                </span>
+              </Tooltip>
+            )}
             {ai.safetyRisk && <TagBadge tone="red">Safety risk</TagBadge>}
           </div>
           {ai.error && ai.error !== 'not_configured' && (

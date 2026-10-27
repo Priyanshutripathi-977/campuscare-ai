@@ -43,7 +43,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-600"
+        className="relative rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-navy-900 focus-visible:outline-2 focus-visible:outline-brand-600"
       >
         <svg
           aria-hidden
@@ -56,7 +56,7 @@ export function NotificationBell() {
           <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-semibold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-semibold text-white ring-2 ring-white animate-scale-in">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -68,10 +68,10 @@ export function NotificationBell() {
           role="region"
           aria-label="Notifications"
           // Phones: full-width sheet below the header (16px margins). Larger screens: dropdown under the bell.
-          className="fixed inset-x-4 top-16 z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]"
+          className="fixed inset-x-4 top-16 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-scale-in sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[24rem] sm:origin-top-right"
         >
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
-            <p className="text-sm font-semibold text-slate-900">Notifications</p>
+            <p className="text-sm font-semibold text-navy-900">Notifications</p>
             {unread > 0 && (
               <button
                 type="button"

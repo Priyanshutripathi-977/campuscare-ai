@@ -154,7 +154,9 @@ describe('Journey A: confident AI → automatic routing → staff fixes it → s
     expect(detail.updates.map((u: { message: string }) => u.message)).toEqual([
       'Technician will come at 3 pm.',
     ]);
-    expect(detail.ai).toBeNull(); // internal AI details are not shown to students
+    // Students see the summary and suggestion, but not internal details like confidence.
+    expect(detail.ai).toMatchObject({ view: 'student', source: 'gemini', category: 'Electrical' });
+    expect(detail.ai).not.toHaveProperty('confidence');
     expect((await student.get(`/api/tickets/${t.ticketId}/image`)).status).toBe(200);
     const notes = await inbox(student);
     expect(notes.items.map((n) => n.message)).toEqual([

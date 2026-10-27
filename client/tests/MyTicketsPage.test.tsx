@@ -21,9 +21,10 @@ describe('MyTicketsPage', () => {
     ]);
     renderWithProviders(<MyTicketsPage />, { user: studentUser });
     expect(await screen.findByText('CC-2026-000001')).toBeInTheDocument();
-    const list = screen.getByRole('list');
-    expect(within(list).getByText('In Progress')).toBeInTheDocument();
-    expect(within(list).getByText(/demo data/i)).toBeInTheDocument();
+    const card = screen.getByRole('link', { name: /CC-2026-000001/ });
+    expect(within(card).getAllByText('In Progress').length).toBeGreaterThan(0); // badge + progress tracker
+    expect(within(card).getByText(/demo data/i)).toBeInTheDocument();
+    expect(within(card).getByLabelText('Progress: In Progress')).toBeInTheDocument();
   });
 
   it('passes URL filters to the API', async () => {
