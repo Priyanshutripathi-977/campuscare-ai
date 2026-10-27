@@ -45,8 +45,9 @@ export interface TicketSummaryDTO {
   updatedAt: string;
 }
 
-/** AI analysis as shown to staff/admin. Students only receive `clarificationQuestion`. */
+/** AI analysis as shown to staff/admin (`view: 'full'`). */
 export interface AiAnalysisDTO {
+  view: 'full';
   source: 'gemini' | 'fallback_rules';
   model: string | null;
   valid: boolean;
@@ -66,6 +67,21 @@ export interface AiAnalysisDTO {
   processedAt: string;
 }
 
+/**
+ * What the reporting student may see about the analysis of THEIR OWN complaint:
+ * a plain summary and the suggestion — not internal reasons, errors or confidence.
+ */
+export interface StudentAiDTO {
+  view: 'student';
+  source: 'gemini' | 'fallback_rules';
+  summary: string | null;
+  category: Category | null;
+  priority: Priority | null;
+  recommendedDepartment: { id: string; name: string } | null;
+  needsClarification: boolean;
+  clarificationQuestion: string | null;
+}
+
 export interface TicketDetailDTO extends TicketSummaryDTO {
   description: string;
   studentCategory: Category | null;
@@ -75,8 +91,8 @@ export interface TicketDetailDTO extends TicketSummaryDTO {
   hasImage: boolean;
   reviewReasons: string[];
   classification: { source: 'admin' | 'ai'; by: string | null; at: string } | null;
-  /** Full AI analysis for staff/admin; for students only the clarification question (if any). */
-  ai: AiAnalysisDTO | { clarificationQuestion: string | null; needsClarification: boolean } | null;
+  /** Full AI analysis for staff/admin; a limited view for the student who reported it. */
+  ai: AiAnalysisDTO | StudentAiDTO | null;
   routing: { method: 'auto' | 'manual' | 'admin_review'; reason: string; decidedAt: string } | null;
   resolvedAt: string | null;
   duplicates: TicketDuplicatesDTO;
@@ -118,6 +134,16 @@ export interface StatsDTO {
   byCategory: Record<string, number>;
   byPriority: Record<string, number>;
   byDepartment: { name: string; count: number }[];
+  /** Like byPriority, but only tickets that are not resolved yet ("Unassessed" = no priority). */
+  openByPriority: Record<string, number>;
+  /** Per department: workload and how quickly it resolves tickets (unassigned tickets excluded). */
+  departmentPerformance: {
+    name: string;
+    open: number;
+    resolved: number;
+    overdue: number;
+    avgResolutionHours: number | null;
+  }[];
   createdPerDay: { date: string; count: number }[];
 }
 

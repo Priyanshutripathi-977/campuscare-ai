@@ -14,6 +14,7 @@ import { Modal } from '../../components/ui/Modal';
 import { TextField } from '../../components/ui/Field';
 import { Alert } from '../../components/ui/Alert';
 import { Pagination } from '../../components/ui/Pagination';
+import { useToast } from '../../components/ui/Toast';
 import { EmptyState, ErrorState, PageLoader } from '../../components/ui/States';
 import { DemoBadge, StatusBadge, TagBadge } from '../../components/tickets/Badges';
 
@@ -95,12 +96,18 @@ export function DuplicatesPage() {
 
 function SuggestionCard({ suggestion: s }: { suggestion: DuplicateSuggestionDTO }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState('');
   const decide = useMutation({
     mutationFn: (decision: 'confirmed' | 'dismissed') =>
       decideDuplicate(s.id, decision, note.trim() || undefined),
-    onSuccess: () => {
+    onSuccess: (_res, decision) => {
+      toast({
+        tone: 'success',
+        title: decision === 'confirmed' ? 'Linked as duplicate' : 'Marked as not a duplicate',
+        description: `${s.ticket.ticketId} ↔ ${s.candidate.ticketId}`,
+      });
       setConfirming(false);
       void queryClient.invalidateQueries({ queryKey: ['duplicates'] });
       void queryClient.invalidateQueries({ queryKey: ['stats'] });

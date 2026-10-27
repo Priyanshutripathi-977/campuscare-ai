@@ -55,22 +55,24 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 backdrop-blur-[2px] animate-fade-in sm:items-center">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-xl bg-white shadow-xl"
+        className="w-full max-w-lg rounded-2xl bg-white shadow-pop animate-scale-in"
       >
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 id={titleId} className="text-base font-semibold">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <h2 id={titleId} className="text-base font-semibold text-navy-900">
             {title}
           </h2>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">{footer}</div>
+          <div className="flex justify-end gap-2 rounded-b-2xl border-t border-slate-100 bg-slate-50/70 px-6 py-3">
+            {footer}
+          </div>
         )}
       </div>
     </div>

@@ -113,13 +113,23 @@ function toAiDTO(t: PopulatedTicket, isStudentViewer: boolean): TicketDetailDTO[
   const ai = t.ai;
   if (!ai) return null;
   if (isStudentViewer) {
-    // Students only see a clarification request, and only while it is still relevant.
+    // The reporting student sees a plain summary + suggestion for their own complaint.
+    // Reasons, errors, confidence and validity stay internal. The question is only shown
+    // while it is still relevant.
     const asking = Boolean(ai.needsClarification) && t.status === 'Under Review';
-    return asking
-      ? { needsClarification: true, clarificationQuestion: ai.clarificationQuestion ?? null }
-      : null;
+    return {
+      view: 'student',
+      source: ai.source,
+      summary: ai.summary ?? null,
+      category: ai.category ?? null,
+      priority: ai.priority ?? null,
+      recommendedDepartment: ref(ai.recommendedDepartment),
+      needsClarification: asking,
+      clarificationQuestion: asking ? (ai.clarificationQuestion ?? null) : null,
+    };
   }
   return {
+    view: 'full',
     source: ai.source,
     model: ai.model ?? null,
     valid: Boolean(ai.valid),

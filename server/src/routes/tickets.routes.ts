@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import { Router } from 'express';
 import {
   AddUpdateSchema,
@@ -72,6 +73,13 @@ export function ticketsRouter(limiters: ReturnType<typeof createLimiters>) {
   router.get('/:ticketId/image', async (req, res) => {
     const { ticketId } = parse(TicketIdParam, req.params);
     const image = await tickets.getTicketImage(req.user!, ticketId);
+    // Check the file still exists BEFORE setting image headers, so a missing file gives a
+    // clean JSON 404 instead of a 500 labelled as an image.
+    try {
+      await fs.access(imagePath(image.filename));
+    } catch {
+      throw new HttpError(404, 'The photo for this ticket is no longer available');
+    }
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.type(image.mimeType).sendFile(imagePath(image.filename));
   });

@@ -17,6 +17,7 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { TextArea } from '../ui/Field';
 import { Alert } from '../ui/Alert';
+import { useToast } from '../ui/Toast';
 
 const ACTION_LABELS: Partial<Record<Status, string>> = {
   'In Progress': 'Start work',
@@ -31,6 +32,7 @@ export function StatusActions({ ticket, role }: { ticket: TicketDetailDTO; role:
   const [confirmed, setConfirmed] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const toast = useToast();
   const options = ALLOWED_TRANSITIONS[ticket.status].filter((to) =>
     canTransition(role, ticket.status, to),
   );
@@ -43,6 +45,11 @@ export function StatusActions({ ticket, role }: { ticket: TicketDetailDTO; role:
         confirm: target === 'Resolved' ? confirmed : undefined,
       }),
     onSuccess: (updated) => {
+      toast({
+        tone: 'success',
+        title: `Status changed to ${updated.status}`,
+        description: updated.ticketId,
+      });
       queryClient.setQueryData(['ticket', ticket.ticketId], updated);
       void queryClient.invalidateQueries({ queryKey: ['tickets'] });
       void queryClient.invalidateQueries({ queryKey: ['stats'] });

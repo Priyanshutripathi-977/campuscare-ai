@@ -25,7 +25,7 @@ function FieldShell({ label, error, hint, required, children }: FieldShellProps)
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-800">
+      <label htmlFor={id} className="block text-sm font-medium text-navy-800">
         {label}
         {required ? (
           <span className="text-red-600" aria-hidden>
@@ -52,8 +52,8 @@ function FieldShell({ label, error, hint, required, children }: FieldShellProps)
 }
 
 const control =
-  'block w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-500 ' +
-  'focus:outline-2 focus:outline-offset-0 focus:outline-brand-500 disabled:bg-slate-100';
+  'block w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-navy-900 shadow-xs transition-colors placeholder:text-slate-500 hover:border-slate-400 ' +
+  'focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/25 disabled:bg-slate-100';
 const controlState = (invalid: boolean) => (invalid ? 'border-red-500' : 'border-slate-300');
 
 type Common = { label: string; error?: string; hint?: ReactNode };

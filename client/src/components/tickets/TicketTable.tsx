@@ -6,10 +6,10 @@ import { DemoBadge, PriorityBadge, StatusBadge, TagBadge } from './Badges';
 
 export function TicketTable({ tickets }: { tickets: TicketSummaryDTO[] }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-card">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <caption className="sr-only">Tickets</caption>
-        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
           <tr>
             <th scope="col" className="px-4 py-3">
               Ticket
@@ -33,11 +33,11 @@ export function TicketTable({ tickets }: { tickets: TicketSummaryDTO[] }) {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {tickets.map((t) => (
-            <tr key={t.id} className="hover:bg-slate-50">
-              <td className="max-w-xs px-4 py-3">
+            <tr key={t.id} className="transition-colors hover:bg-brand-50/40">
+              <td className="min-w-64 max-w-sm px-4 py-3">
                 <Link
                   to={`/tickets/${t.ticketId}`}
-                  className="font-medium text-slate-900 hover:text-brand-700 hover:underline"
+                  className="font-medium text-navy-900 hover:text-brand-700 hover:underline"
                 >
                   {t.title}
                 </Link>

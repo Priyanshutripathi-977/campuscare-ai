@@ -50,7 +50,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   res.status(500).json({
     error: {
       message: 'Something went wrong on our side. Please try again.',
-      ...(isProduction ? {} : { debug: String(err?.message ?? err) }),
+      ...(env.SHOW_ERROR_DETAILS && !isProduction ? { debug: String(err?.message ?? err) } : {}),
     },
   });
 };

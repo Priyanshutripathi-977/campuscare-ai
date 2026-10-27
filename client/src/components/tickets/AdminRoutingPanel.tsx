@@ -17,15 +17,79 @@ import { ApiError } from '../../api/client';
 import { Button } from '../ui/Button';
 import { SelectField, TextField } from '../ui/Field';
 import { Alert } from '../ui/Alert';
+import { useToast } from '../ui/Toast';
+import { Sparkles } from 'lucide-react';
+import { isFullAi } from './AiAnalysisCard';
 
 export function AdminRoutingPanel({ ticket }: { ticket: TicketDetailDTO }) {
   const locked = ticket.status === 'Resolved';
   return (
     <div className="space-y-6">
       {locked && <Alert tone="info">Resolved tickets cannot be reclassified or reassigned.</Alert>}
+      {!locked && <AcceptSuggestion ticket={ticket} />}
       <ClassifyForm ticket={ticket} disabled={locked} />
       <hr className="border-slate-200" />
       <AssignForm ticket={ticket} disabled={locked} />
+    </div>
+  );
+}
+
+/**
+ * One-click review for uncertain tickets: accepts the AI/keyword suggestion by calling the
+ * SAME classify + assign endpoints an admin would use by hand. Only shown while the ticket is
+ * waiting for review and the suggestion maps to a department.
+ */
+function AcceptSuggestion({ ticket }: { ticket: TicketDetailDTO }) {
+  const onUpdated = useTicketUpdater(ticket.ticketId);
+  const toast = useToast();
+  const ai = isFullAi(ticket.ai) ? ticket.ai : null;
+  const dept = ai?.recommendedDepartment;
+  const accept = useMutation({
+    mutationFn: async () => {
+      await classifyTicket(ticket.ticketId, { category: ai!.category!, priority: ai!.priority! });
+      return assignTicket(ticket.ticketId, {
+        departmentId: dept!.id,
+        note: 'Suggestion accepted by an administrator',
+      });
+    },
+    onSuccess: (t) => {
+      onUpdated(t);
+      toast({
+        tone: 'success',
+        title: 'Suggestion accepted',
+        description: `${t.ticketId} assigned to ${dept!.name}.`,
+      });
+    },
+  });
+  if (!ai || !dept || !ai.category || !ai.priority || ticket.department || !ticket.needsReview)
+    return null;
+
+  return (
+    <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-navy-900">
+        <Sparkles aria-hidden className="h-4 w-4 text-brand-600" />
+        Suggested routing
+      </p>
+      <p className="mt-1 text-sm text-slate-700">
+        <strong>{ai.category}</strong> · <strong>{ai.priority}</strong> →{' '}
+        <strong>{dept.name}</strong>
+        <span className="text-slate-600">
+          {' '}
+          ({ai.source === 'gemini' ? 'Gemini' : 'keyword classifier'}
+          {ai.confidence !== null && `, ${Math.round(ai.confidence * 100)}% confident`})
+        </span>
+      </p>
+      {accept.isError && (
+        <div className="mt-2">
+          <Alert tone="error">{accept.error.message}</Alert>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" loading={accept.isPending} onClick={() => accept.mutate()}>
+          Accept suggestion & assign
+        </Button>
+        <span className="self-center text-xs text-slate-600">or change it below</span>
+      </div>
     </div>
   );
 }

@@ -334,6 +334,18 @@ describe('admin endpoints', () => {
     expect(all.createdPerDay).toHaveLength(14);
     expect(all.createdPerDay.at(-1).count).toBe(2);
 
+    // Open tickets by priority (resolved ones excluded) and per-department performance.
+    expect(all.openByPriority).toMatchObject({ High: 1, Medium: 1, Critical: 0 }); // Medium = keyword suggestion
+    expect(all.departmentPerformance).toEqual([
+      {
+        name: 'Electrical Maintenance',
+        open: 1,
+        resolved: 0,
+        overdue: 0,
+        avgResolutionHours: null,
+      },
+    ]);
+
     const dept = (await elecStaff.get('/api/admin/stats')).body.stats;
     expect(dept).toMatchObject({ scope: 'department', total: 1 });
     expect((await student.get('/api/admin/stats')).status).toBe(403);
@@ -344,5 +356,74 @@ describe('admin endpoints', () => {
     const staff = (await admin.get(`/api/admin/staff?department=${elecDeptId}`)).body.staff;
     expect(staff.map((s: { id: string }) => s.id)).toEqual([elecStaffId]);
     expect((await elecStaff.get('/api/admin/staff')).status).toBe(403);
+  });
+});
+
+describe('dashboard performance numbers', () => {
+  it('counts open/resolved/overdue per department and the average time to resolve', async () => {
+    const { body: a } = await submit(student);
+    const { body: b } = await submit(student);
+    for (const t of [a.ticket, b.ticket]) {
+      await admin
+        .patch(`/api/tickets/${t.ticketId}/classification`)
+        .send({ category: 'Electrical', priority: 'Critical' });
+      await admin.patch(`/api/tickets/${t.ticketId}/assign`).send({ departmentId: elecDeptId });
+    }
+    // Ticket A: resolved exactly 2 hours after it was created.
+    const created = (await TicketModel.findOne({ ticketId: a.ticket.ticketId }).lean())!.createdAt;
+    await TicketModel.updateOne(
+      { ticketId: a.ticket.ticketId },
+      { status: 'Resolved', resolvedAt: new Date(created.getTime() + 2 * 3600_000) },
+    );
+    // Ticket B: still open and past its deadline.
+    await TicketModel.updateOne(
+      { ticketId: b.ticket.ticketId },
+      { dueAt: new Date(Date.now() - 60_000) },
+    );
+
+    const s = (await admin.get('/api/admin/stats')).body.stats;
+    expect(s.departmentPerformance).toEqual([
+      { name: 'Electrical Maintenance', open: 1, resolved: 1, overdue: 1, avgResolutionHours: 2 },
+    ]);
+    expect(s.openByPriority.Critical).toBe(1); // the resolved Critical ticket is not counted
+    expect(s.byPriority.Critical).toBe(2);
+  });
+});
+
+describe('audit regressions B3–B5', () => {
+  it('B3: "overdue" combined with status "Resolved" returns nothing (resolved tickets are never overdue)', async () => {
+    const id = await createAssignedTicket();
+    await TicketModel.updateOne({ ticketId: id }, { dueAt: new Date(Date.now() - 1000) });
+    expect((await admin.get('/api/tickets?overdue=true&status=Resolved')).body.total).toBe(0);
+    expect((await admin.get('/api/tickets?overdue=true&status=Assigned')).body.total).toBe(1);
+    expect((await admin.get('/api/tickets?overdue=true')).body.total).toBe(1);
+  });
+
+  it('B4: "Due soonest" lists open tickets before resolved ones', async () => {
+    const resolved = await createAssignedTicket();
+    const open = await createAssignedTicket();
+    await TicketModel.updateOne(
+      { ticketId: resolved },
+      { status: 'Resolved', resolvedAt: new Date(), dueAt: new Date(Date.now() - 86_400_000) },
+    );
+    await TicketModel.updateOne({ ticketId: open }, { dueAt: new Date(Date.now() + 86_400_000) });
+    const ids = (await admin.get('/api/tickets?sort=due')).body.items.map(
+      (t: { ticketId: string }) => t.ticketId,
+    );
+    expect(ids.indexOf(open)).toBeLessThan(ids.indexOf(resolved));
+  });
+
+  it('B5: a photo missing from disk gives a clean JSON 404, not a 500', async () => {
+    const res = await submit(student).attach('image', PNG_1PX, {
+      filename: 'p.png',
+      contentType: 'image/png',
+    });
+    const doc = await TicketModel.findOne({ ticketId: res.body.ticket.ticketId }).lean();
+    const fs = await import('node:fs/promises');
+    await fs.rm(`${process.env.UPLOAD_DIR}/${doc!.image!.filename}`);
+    const img = await student.get(`/api/tickets/${res.body.ticket.ticketId}/image`);
+    expect(img.status).toBe(404);
+    expect(img.headers['content-type']).toMatch(/application\/json/);
+    expect(img.body.error.message).toMatch(/no longer available/);
   });
 });

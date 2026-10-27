@@ -2,7 +2,7 @@
  * Makes the logged-in user available to every component via useAuth().
  * The user comes from GET /api/auth/me (the cookie itself is unreadable to JavaScript).
  */
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UserDTO } from '@campuscare/shared';
 import { getMe, logout as apiLogout } from '../api/auth';
@@ -14,6 +14,8 @@ interface AuthState {
   refetch: () => void;
   setUser: (user: UserDTO | null) => Promise<void>;
   logout: () => Promise<void>;
+  /** True after the user chose to log out (until the next login): no "return to" page is kept. */
+  loggedOut: boolean;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -33,6 +35,7 @@ async function switchUser(queryClient: QueryClient, user: UserDTO | null) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['me'], queryFn: getMe, retry: false, staleTime: 60_000 });
+  const [loggedOut, setLoggedOut] = useState(false);
 
   const logoutMutation = useMutation({
     mutationFn: apiLogout,
@@ -44,8 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: me.isPending,
     error: me.error,
     refetch: () => void me.refetch(),
-    setUser: (user) => switchUser(queryClient, user),
-    logout: () => logoutMutation.mutateAsync(),
+    setUser: (user) => {
+      setLoggedOut(false);
+      return switchUser(queryClient, user);
+    },
+    logout: () => {
+      setLoggedOut(true); // set before the user disappears, so no "return to" page is recorded
+      return logoutMutation.mutateAsync();
+    },
+    loggedOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

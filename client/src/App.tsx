@@ -8,6 +8,7 @@ import { PageLoader } from './components/ui/States';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { MyTicketsPage } from './pages/student/MyTicketsPage';
+import { StudentDashboard } from './pages/student/StudentDashboard';
 import { NewComplaintPage } from './pages/student/NewComplaintPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 
@@ -50,6 +51,14 @@ export default function App() {
       >
         <Route
           path="/student"
+          element={
+            <RequireAuth roles={['student']}>
+              <StudentDashboard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/student/tickets"
           element={
             <RequireAuth roles={['student']}>
               <MyTicketsPage />

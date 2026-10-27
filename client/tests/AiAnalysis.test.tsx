@@ -22,6 +22,7 @@ const adminUser: UserDTO = {
 };
 
 const analysis = (o: Partial<AiAnalysisDTO> = {}): AiAnalysisDTO => ({
+  view: 'full',
   source: 'gemini',
   model: 'gemini-2.5-flash',
   valid: true,
@@ -101,7 +102,16 @@ describe('TicketDetailPage clarification request', () => {
           jsonResponse({
             ticket: ticketFixture({
               status: 'Under Review',
-              ai: { needsClarification: true, clarificationQuestion: 'Which room is it in?' },
+              ai: {
+                view: 'student',
+                source: 'fallback_rules',
+                summary: 'Something is broken.',
+                category: 'Other',
+                priority: 'Medium',
+                recommendedDepartment: null,
+                needsClarification: true,
+                clarificationQuestion: 'Which room is it in?',
+              },
             }),
           }),
       ],

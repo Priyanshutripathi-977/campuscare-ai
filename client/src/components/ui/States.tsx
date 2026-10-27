@@ -1,5 +1,6 @@
 /** Standard loading / error / empty states so every page behaves the same way. */
 import type { ReactNode } from 'react';
+import { AlertOctagon, FileSearch, type LucideIcon } from 'lucide-react';
 import { Spinner } from './Spinner';
 import { Button } from './Button';
 
@@ -22,9 +23,18 @@ export function ErrorState({
 }) {
   const message = error instanceof Error ? error.message : 'Unexpected error';
   return (
-    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-      <p className="font-semibold text-red-800">{title}</p>
-      <p className="mt-1 text-sm text-red-700">{message}</p>
+    <div
+      role="alert"
+      className="rounded-2xl border border-red-200 bg-red-50/70 p-8 text-center animate-fade-in"
+    >
+      <span
+        aria-hidden
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-600"
+      >
+        <AlertOctagon className="h-5 w-5" />
+      </span>
+      <p className="mt-3 font-semibold text-red-900">{title}</p>
+      <p className="mt-1 text-sm text-red-800">{message}</p>
       {onRetry && (
         <Button variant="secondary" size="sm" className="mt-4" onClick={onRetry}>
           Try again
@@ -38,25 +48,23 @@ export function EmptyState({
   title,
   description,
   action,
+  icon: Icon = FileSearch,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  icon?: LucideIcon;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-      <svg
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center animate-fade-in">
+      <span
         aria-hidden
-        viewBox="0 0 24 24"
-        className="mx-auto h-10 w-10 text-slate-300"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
+        className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"
       >
-        <path d="M9 12h6m-6 4h6M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
-      </svg>
-      <p className="mt-3 font-semibold text-slate-800">{title}</p>
-      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+        <Icon className="h-6 w-6" />
+      </span>
+      <p className="mt-4 font-semibold text-navy-900">{title}</p>
+      {description && <p className="mx-auto mt-1 max-w-sm text-sm text-slate-600">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

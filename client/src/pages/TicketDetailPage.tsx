@@ -12,7 +12,7 @@ import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatDateTime, formatLocation, relativeTime, REVIEW_REASON_LABELS } from '../lib/format';
 import { Card } from '../components/ui/Card';
-import { ErrorState, PageLoader } from '../components/ui/States';
+import { ErrorState } from '../components/ui/States';
 import { DemoBadge, PriorityBadge, StatusBadge, TagBadge } from '../components/tickets/Badges';
 import { StatusTimeline } from '../components/tickets/StatusTimeline';
 import { UpdatesThread } from '../components/tickets/UpdatesThread';
@@ -22,6 +22,20 @@ import { AdminRoutingPanel } from '../components/tickets/AdminRoutingPanel';
 import { AiAnalysisCard } from '../components/tickets/AiAnalysisCard';
 import { DuplicatesPanel } from '../components/tickets/DuplicatesPanel';
 import { Alert } from '../components/ui/Alert';
+import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
+import { TicketProgress } from '../components/tickets/TicketProgress';
+import {
+  ArrowLeft,
+  Bot,
+  Cpu,
+  FileText,
+  GitBranch,
+  History,
+  MessageSquare,
+  Sparkles,
+  Workflow,
+} from 'lucide-react';
+import type { TicketDetailDTO } from '@campuscare/shared';
 
 export function TicketDetailPage() {
   const { ticketId = '' } = useParams();
@@ -31,9 +45,9 @@ export function TicketDetailPage() {
     queryFn: () => getTicket(ticketId),
     retry: false,
   });
-  const backTo = user?.role === 'student' ? '/student' : '/admin/tickets';
+  const backTo = user?.role === 'student' ? '/student/tickets' : '/admin/tickets';
 
-  if (ticket.isPending) return <PageLoader label="Loading ticket…" />;
+  if (ticket.isPending) return <TicketSkeleton />;
   if (ticket.isError) {
     const notFound =
       ticket.error instanceof ApiError &&
@@ -51,7 +65,7 @@ export function TicketDetailPage() {
         />
         <p className="text-center">
           <Link to={backTo} className="text-sm font-medium text-brand-700 hover:underline">
-            ← Back to tickets
+            Back to tickets
           </Link>
         </p>
       </div>
@@ -64,23 +78,36 @@ export function TicketDetailPage() {
 
   return (
     <div>
-      <Link to={backTo} className="text-sm font-medium text-brand-700 hover:underline">
-        ← Back to tickets
+      <Link
+        to={backTo}
+        className="inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-brand-700 hover:underline"
+      >
+        <ArrowLeft aria-hidden className="h-4 w-4" />
+        Back to tickets
       </Link>
 
       <div className="mt-3 mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm text-slate-500">{t.ticketId}</span>
+          <span className="font-mono text-sm font-medium text-slate-600">{t.ticketId}</span>
           <StatusBadge status={t.status} />
           <PriorityBadge priority={t.priority} />
           {t.overdue && <TagBadge tone="red">Overdue</TagBadge>}
           {isStaffOrAdmin && t.needsReview && <TagBadge tone="violet">Needs review</TagBadge>}
           {t.isDemo && <DemoBadge />}
         </div>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{t.title}</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-900 sm:text-[28px]">
+          {t.title}
+        </h1>
       </div>
 
-      {role === 'student' && t.ai && 'needsClarification' in t.ai && t.ai.needsClarification && (
+      <section
+        aria-label="Ticket progress"
+        className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-5 shadow-card sm:px-8"
+      >
+        <TicketProgress status={t.status} history={t.statusHistory} />
+      </section>
+
+      {role === 'student' && t.ai?.view === 'student' && t.ai.needsClarification && (
         <div className="mb-6">
           <Alert tone="warning" title="We need a few more details">
             <p>{t.ai.clarificationQuestion ?? 'Please describe the problem in more detail.'}</p>
@@ -91,9 +118,9 @@ export function TicketDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <Card title="Details">
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <Card title="Details" icon={FileText}>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
               {t.description}
             </p>
@@ -135,24 +162,27 @@ export function TicketDetailPage() {
             </dl>
           </Card>
 
-          <Card title={`Updates (${t.updates.length})`}>
+          <Card title={`Updates (${t.updates.length})`} icon={MessageSquare}>
             <UpdatesThread ticket={t} />
           </Card>
         </div>
 
         <div className="space-y-6">
+          {role === 'student' && t.ai?.view === 'student' && (
+            <StudentAiSummary ai={t.ai} ticket={t} />
+          )}
           {role === 'student' && t.status === 'Resolved' && (
             <Card title="Not fixed?">
               <ReopenAction ticket={t} />
             </Card>
           )}
           {isStaffOrAdmin && (
-            <Card title="Status">
+            <Card title="Status" icon={Workflow}>
               <StatusActions ticket={t} role={role} />
             </Card>
           )}
           {role === 'admin' && (
-            <Card title="Classification & routing">
+            <Card title="Classification & routing" icon={GitBranch}>
               <AdminRoutingPanel ticket={t} />
             </Card>
           )}
@@ -162,7 +192,7 @@ export function TicketDetailPage() {
             </Card>
           )}
           {isStaffOrAdmin && (
-            <Card title="AI analysis">
+            <Card title="AI analysis" icon={Sparkles}>
               <AiAnalysisCard ticket={t} canRerun={role === 'admin'} />
             </Card>
           )}
@@ -190,7 +220,7 @@ export function TicketDetailPage() {
               </dl>
             </Card>
           )}
-          <Card title="History">
+          <Card title="History" icon={History}>
             <StatusTimeline history={t.statusHistory} />
           </Card>
         </div>
@@ -202,9 +232,9 @@ export function TicketDetailPage() {
 function Info({ label, value, extra }: { label: string; value: string; extra?: string | null }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-slate-900">{value}</dd>
-      {extra && <dd className="text-xs text-slate-500">{extra}</dd>}
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-600">{label}</dt>
+      <dd className="mt-0.5 text-navy-900">{value}</dd>
+      {extra && <dd className="text-xs text-slate-600">{extra}</dd>}
     </div>
   );
 }
@@ -212,7 +242,7 @@ function Info({ label, value, extra }: { label: string; value: string; extra?: s
 function TicketImage({ ticketId }: { ticketId: string }) {
   const [failed, setFailed] = useState(false);
   if (failed)
-    return <p className="mt-4 text-sm text-slate-500">The attached photo could not be loaded.</p>;
+    return <p className="mt-4 text-sm text-slate-600">The attached photo could not be loaded.</p>;
   return (
     <a
       href={ticketImageUrl(ticketId)}
@@ -225,8 +255,73 @@ function TicketImage({ ticketId }: { ticketId: string }) {
         alt="Photo attached to this complaint"
         loading="lazy"
         onError={() => setFailed(true)}
-        className="max-h-80 rounded-lg border border-slate-200 object-contain"
+        className="max-h-80 rounded-xl border border-slate-200 object-contain transition-shadow hover:shadow-card-hover"
       />
     </a>
+  );
+}
+
+/** The student's view of how their complaint was analysed (summary + suggestion, no internals). */
+function StudentAiSummary({
+  ai,
+  ticket,
+}: {
+  ai: Extract<TicketDetailDTO['ai'], { view: 'student' }>;
+  ticket: TicketDetailDTO;
+}) {
+  const routedAutomatically =
+    ticket.department && ticket.statusHistory.some((h) => h.to === 'Assigned' && !h.by);
+  return (
+    <Card title="How your complaint was analysed" icon={Bot}>
+      <div className="space-y-3 text-sm">
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+          {ai.source === 'gemini' ? (
+            <Sparkles aria-hidden className="h-3.5 w-3.5 text-brand-600" />
+          ) : (
+            <Cpu aria-hidden className="h-3.5 w-3.5" />
+          )}
+          {ai.source === 'gemini' ? 'Gemini AI' : 'Keyword classifier (not AI)'}
+        </p>
+        {ai.summary && <p className="text-slate-700">{ai.summary}</p>}
+        <dl className="grid grid-cols-2 gap-3">
+          <Info label="Suggested category" value={ai.category ?? '—'} />
+          <Info label="Suggested priority" value={ai.priority ?? '—'} />
+          <Info label="Suggested department" value={ai.recommendedDepartment?.name ?? '—'} />
+          <Info
+            label="Decision"
+            value={
+              routedAutomatically
+                ? 'Routed automatically'
+                : ticket.department
+                  ? 'Confirmed by an administrator'
+                  : 'Waiting for an administrator'
+            }
+          />
+        </dl>
+        <p className="text-xs text-slate-600">
+          Suggestions are checked by the routing rules; anything uncertain is confirmed by a person.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+/** Placeholder layout while the ticket loads. */
+function TicketSkeleton() {
+  return (
+    <SkeletonGroup label="Loading ticket…">
+      <Skeleton className="h-4 w-32" />
+      <div className="mt-4 flex gap-2">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-5 w-24 rounded-full" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </div>
+      <Skeleton className="mt-3 h-8 w-2/3" />
+      <Skeleton className="mt-6 h-24 w-full rounded-2xl" />
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <Skeleton className="h-72 rounded-2xl xl:col-span-2" />
+        <Skeleton className="h-72 rounded-2xl" />
+      </div>
+    </SkeletonGroup>
   );
 }

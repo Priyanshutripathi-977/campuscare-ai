@@ -1,37 +1,29 @@
-/** Page frame: top bar with role-based navigation, the user's name and a logout button. */
-import { Suspense, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router';
-import type { Role } from '@campuscare/shared';
+/** Page frame: sidebar (drawer on phones) + top bar + the current page. */
+import { Suspense, useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router';
+import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Button } from './ui/Button';
 import { PageLoader } from './ui/States';
-import { NotificationBell } from './notifications/NotificationBell';
-
-const NAV: Record<Role, { to: string; label: string; end?: boolean }[]> = {
-  student: [
-    { to: '/student', label: 'My complaints', end: true },
-    { to: '/student/new', label: 'Report a problem' },
-  ],
-  staff: [
-    { to: '/admin', label: 'Dashboard', end: true },
-    { to: '/admin/tickets', label: 'Department tickets' },
-  ],
-  admin: [
-    { to: '/admin', label: 'Dashboard', end: true },
-    { to: '/admin/tickets', label: 'All tickets' },
-    { to: '/admin/duplicates', label: 'Duplicates' },
-    { to: '/admin/settings', label: 'Settings' },
-  ],
-};
+import { Sidebar } from './layout/Sidebar';
+import { Topbar } from './layout/Topbar';
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const location = useLocation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Close the drawer with Escape.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
+
   if (!user) return null;
 
   const onLogout = async () => {
-    setLoggingOut(true);
     try {
       await logout();
     } finally {
@@ -40,52 +32,53 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen lg:pl-64">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[70] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow-pop"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 font-semibold text-slate-900">
-            <img src="/favicon.svg" alt="" className="h-7 w-7" />
-            CampusCare AI
-          </Link>
-          <nav
-            aria-label="Main"
-            className="order-3 -mx-1 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto"
-          >
-            {NAV[user.role].map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
-            <NotificationBell />
-            <div className="hidden text-right text-sm leading-tight sm:block">
-              <p className="font-medium text-slate-900">{user.name}</p>
-              <p className="text-xs capitalize text-slate-500">
-                {user.role}
-                {user.department && ` · ${user.department.name}`}
-              </p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={onLogout} loading={loggingOut}>
-              Log out
-            </Button>
+
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
+        <Sidebar user={user} />
+      </aside>
+
+      {/* Phone/tablet drawer */}
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation menu"
+        >
+          <div
+            className="absolute inset-0 bg-navy-950/50 animate-fade-in"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 w-72 max-w-[85vw] animate-slide-up shadow-pop">
+            <Sidebar user={user} onNavigate={() => setDrawerOpen(false)} />
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Close navigation menu"
+              autoFocus
+              className="absolute right-3 top-4 rounded-lg p-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+            >
+              <X aria-hidden className="h-5 w-5" />
+            </button>
           </div>
         </div>
-      </header>
-      <main id="main" className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+      )}
+
+      <Topbar user={user} onMenu={() => setDrawerOpen(true)} onLogout={onLogout} />
+
+      <main
+        id="main"
+        key={location.pathname}
+        className="mx-auto max-w-7xl px-4 py-6 animate-fade-in sm:px-6 sm:py-8"
+      >
         {/* Shows a spinner while a lazily-loaded page (e.g. the dashboard) downloads. */}
         <Suspense fallback={<PageLoader />}>
           <Outlet />
@@ -99,18 +92,25 @@ export function PageHeader({
   title,
   description,
   actions,
+  eyebrow,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  eyebrow?: string;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+        {eyebrow && (
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">{eyebrow}</p>
+        )}
+        <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-navy-900 sm:text-[28px]">
+          {title}
+        </h1>
+        {description && <p className="mt-1 max-w-2xl text-sm text-slate-600">{description}</p>}
       </div>
-      {actions}
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
   );
 }

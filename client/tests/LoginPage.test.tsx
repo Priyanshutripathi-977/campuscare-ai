@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { AuthProvider } from '../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { RequireAuth } from '../src/components/RequireAuth';
 import { LoginPage } from '../src/pages/auth/LoginPage';
 import { jsonResponse, mockApi, studentUser } from './renderWithProviders';
@@ -138,5 +138,84 @@ describe('LoginPage', () => {
     await fillAndSubmit();
     expect(await screen.findByText('Incorrect email or password')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Incorrect email or password');
+  });
+});
+
+// Regression: audit B7 — after logging out on a private page, the NEXT person to log in must not
+// be sent to the previous user's page.
+describe('logout and the "return to" page', () => {
+  function LogoutButton() {
+    const { logout } = useAuth();
+    return <button onClick={() => void logout()}>Log out</button>;
+  }
+  function renderAt(path: string, user: typeof studentUser | null) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['me'], user);
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[path]}>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route
+                path="/tickets/:id"
+                element={
+                  <RequireAuth>
+                    <p>Private ticket page</p>
+                    <LogoutButton />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/student"
+                element={
+                  <RequireAuth roles={['student']}>
+                    <p>Student home</p>
+                  </RequireAuth>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+  const api = () =>
+    mockApi([
+      [
+        '/api/health',
+        () =>
+          jsonResponse({
+            status: 'ok',
+            database: 'connected',
+            uptimeSeconds: 1,
+            aiConfigured: false,
+            time: '',
+          }),
+      ],
+      ['/api/auth/logout', () => new Response(null, { status: 204 })],
+      ['/api/auth/me', () => jsonResponse({ error: { message: 'Please log in' } }, 401)],
+      [
+        '/api/auth/login',
+        () => jsonResponse({ user: { ...studentUser, id: 'neha', name: 'Neha' } }),
+      ],
+    ]);
+
+  it("after a deliberate logout, the next login goes to that user's home, not the old page", async () => {
+    api();
+    renderAt('/tickets/CC-2026-000001', studentUser);
+    await userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+    await fillAndSubmit();
+    expect(await screen.findByText('Student home')).toBeInTheDocument();
+    expect(screen.queryByText('Private ticket page')).not.toBeInTheDocument();
+  });
+
+  it('when a session simply expired (no logout), the user still returns to their page', async () => {
+    api();
+    renderAt('/tickets/CC-2026-000001', null); // not logged in → sent to login with the page remembered
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+    await fillAndSubmit();
+    expect(await screen.findByText('Private ticket page')).toBeInTheDocument();
   });
 });

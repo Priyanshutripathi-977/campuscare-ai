@@ -43,8 +43,8 @@ export const EnvSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v ? v : undefined)),
-  GEMINI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
-  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(12_000),
+  GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.5-flash-lite'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(20_000),
   // Optional email (SMTP). If SMTP_HOST is empty, only in-app notifications are used.
   SMTP_HOST: z
     .string()
@@ -55,6 +55,11 @@ export const EnvSchema = z.object({
   SMTP_USER: z.string().trim().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().trim().default('CampusCare AI <no-reply@example.com>'),
+  // Developer aid: include the real error message in 500 responses. OFF by default and always
+  // ignored in production, so internals (file paths, database hosts) are never sent to users.
+  SHOW_ERROR_DETAILS: z
+    .preprocess(emptyToUndefined, z.enum(['true', 'false']).default('false'))
+    .transform((v) => v === 'true'),
   // Used to build links in emails (defaults to the frontend address).
   APP_URL: z.preprocess(emptyToUndefined, z.url().optional()),
 });

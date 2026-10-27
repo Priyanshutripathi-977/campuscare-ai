@@ -5,6 +5,7 @@
 import { Types } from 'mongoose';
 import {
   canTransition,
+  OPEN_STATUSES,
   PRIORITY_RANK,
   type Category,
   type Priority,
@@ -162,6 +163,18 @@ export async function analyzeAndRoute(
       recommendedDepartment: (decision.recommendedDepartment?.id ??
         null) as unknown as Types.ObjectId,
     };
+
+    // An administrator has already decided the category/priority: an AUTOMATIC re-analysis
+    // (e.g. the student answering a clarification question) must never overwrite that
+    // decision or route the ticket. Only the analysis notes are refreshed; the admin decides.
+    if (trigger === 'clarified' && ticket.classification?.source === 'admin') {
+      ticket.reviewReasons = ticket.reviewReasons.filter(
+        (r) => r !== 'needs_clarification' || ai.needsClarification,
+      );
+      await ticket.save();
+      return;
+    }
+
     // Suggested category/priority are shown (and start the deadline clock) but only an
     // auto-route or an admin action actually sends the ticket to a department.
     ticket.category = ai.category;
@@ -306,7 +319,10 @@ export async function listTickets(actor: Actor, rawQuery: z.output<typeof Ticket
   if (q.needsReview) filter.needsReview = q.needsReview === 'true';
   if (q.overdue === 'true') {
     filter.dueAt = { $lt: new Date() };
-    filter.status = q.status && q.status !== 'Resolved' ? q.status : { $ne: 'Resolved' };
+    // Resolved tickets are never overdue, so "overdue + Resolved" correctly matches nothing.
+    filter.status = {
+      $in: (q.status ? [q.status] : OPEN_STATUSES).filter((st) => st !== 'Resolved'),
+    };
   }
   if (q.q) {
     const re = new RegExp(escapeRegex(q.q), 'i');
@@ -319,7 +335,8 @@ export async function listTickets(actor: Actor, rawQuery: z.output<typeof Ticket
       : q.sort === 'priority'
         ? { priorityRank: -1, createdAt: -1 }
         : q.sort === 'due'
-          ? { dueAt: 1, createdAt: -1 }
+          ? // Open tickets first (resolvedAt is null), then the nearest deadline.
+            { resolvedAt: 1, dueAt: 1, createdAt: -1 }
           : { createdAt: -1 };
 
   const [items, total] = await Promise.all([
@@ -402,9 +419,10 @@ export async function changeStatus(
     set.reviewReasons = ['sent_back_for_review'];
   }
 
-  // The { status: from } condition makes this safe if two people click at the same moment.
+  // Only save if the status AND department are still what this person saw — safe when two
+  // people click at the same moment, or when an admin reassigns the ticket meanwhile.
   const updated = await TicketModel.findOneAndUpdate(
-    { _id: ticket._id, status: from },
+    { _id: ticket._id, status: from, department: ticket.department ?? null },
     { $set: set, $push: { statusHistory: { from, to, by: actor.id, note, at: now } } },
   );
   if (!updated)
@@ -532,37 +550,56 @@ export async function assignTicket(
   const isReassignment = from === 'Assigned' || from === 'In Progress';
   const to: Status = isReassignment ? from : 'Assigned';
 
-  ticket.department = department._id;
-  ticket.assignedTo = (assignedTo ?? null) as unknown as Types.ObjectId;
-  ticket.status = to;
-  ticket.needsReview = false;
-  ticket.reviewReasons = [];
-  ticket.routing = {
-    method: 'manual',
-    decidedBy: actor.id as unknown as Types.ObjectId,
-    reason: note ?? `Assigned to ${department.name} by an administrator`,
-    decidedAt: now,
-  };
-  ticket.statusHistory.push({
-    from,
-    to,
-    by: actor.id as unknown as Types.ObjectId,
-    note: `${isReassignment ? 'Reassigned' : 'Assigned'} to ${department.name}${note ? ` — ${note}` : ''}`,
-    at: now,
-  });
-  await ticket.save();
+  // Save only if nobody changed the status / department / assignee since we loaded the
+  // ticket (two admins assigning at once, or staff starting work during a reassignment).
+  // Otherwise the history could record a state the ticket was not actually in.
+  const updated = await TicketModel.findOneAndUpdate(
+    {
+      _id: ticket._id,
+      status: from,
+      department: ticket.department ?? null,
+      assignedTo: ticket.assignedTo ?? null,
+    },
+    {
+      $set: {
+        department: department._id,
+        assignedTo: assignedTo ?? null,
+        status: to,
+        needsReview: false,
+        reviewReasons: [],
+        routing: {
+          method: 'manual',
+          decidedBy: actor.id,
+          reason: note ?? `Assigned to ${department.name} by an administrator`,
+          decidedAt: now,
+        },
+      },
+      $push: {
+        statusHistory: {
+          from,
+          to,
+          by: actor.id,
+          note: `${isReassignment ? 'Reassigned' : 'Assigned'} to ${department.name}${note ? ` — ${note}` : ''}`,
+          at: now,
+        },
+      },
+    },
+    { returnDocument: 'after' },
+  );
+  if (!updated)
+    throw new HttpError(409, 'The ticket was changed by someone else. Refresh and try again.');
 
   await notifyTicketEvent(
-    ticket,
+    updated,
     'ticket_routed',
     `Your complaint was ${isReassignment ? 'moved' : 'sent'} to ${department.name}.`,
     ['student'],
     actor.id,
   );
   await notifyTicketEvent(
-    ticket,
+    updated,
     'ticket_assigned',
-    `${ticket.assignedTo ? 'Assigned to you' : `New ticket for ${department.name}`}: “${ticket.title}” (${ticket.priority} priority).`,
+    `${updated.assignedTo ? 'Assigned to you' : `New ticket for ${department.name}`}: “${updated.title}” (${updated.priority} priority).`,
     ['department'],
     actor.id,
   );

@@ -206,3 +206,49 @@ describe('other persisted operations', () => {
     expect((await DepartmentModel.findById(itId).lean())!.categories).toEqual(['IT', 'Other']);
   });
 });
+
+describe('simultaneous updates (regression: audit B2)', () => {
+  it('two admins assigning at the same moment: one wins, the other gets 409, history stays consistent', async () => {
+    const admin2 = await (async () => {
+      await createUser('admin', 'a2@x.test');
+      return loginAs(app, 'a2@x.test');
+    })();
+    for (let i = 0; i < 10; i++) {
+      const id = await create();
+      await admin
+        .patch(`/api/tickets/${id}/classification`)
+        .send({ category: 'Electrical', priority: 'High' });
+      const [r1, r2] = await Promise.all([
+        admin.patch(`/api/tickets/${id}/assign`).send({ departmentId: elecId }),
+        admin2.patch(`/api/tickets/${id}/assign`).send({ departmentId: itId }),
+      ]);
+      expect([r1.status, r2.status].sort()).toEqual([200, 409]);
+      const t = await db(id);
+      const assigned = t!.statusHistory.filter((h) => h.to === 'Assigned');
+      expect(assigned).toHaveLength(1);
+      const winner = r1.status === 200 ? elecId : itId;
+      expect(String(t!.department)).toBe(winner);
+    }
+  });
+
+  it('staff starting work while an admin reassigns: never a false 404, history matches reality', async () => {
+    for (let i = 0; i < 10; i++) {
+      const id = await assigned(); // assigned to Electrical, assignee elecStaff
+      const [work, move] = await Promise.all([
+        elecStaff.patch(`/api/tickets/${id}/status`).send({ status: 'In Progress' }),
+        admin.patch(`/api/tickets/${id}/assign`).send({ departmentId: itId, note: 'Moving to IT' }),
+      ]);
+      expect([work.status, move.status].sort()).toEqual([200, 409]);
+      const t = await db(id);
+      if (work.status === 200) {
+        expect(t).toMatchObject({ status: 'In Progress' });
+        expect(String(t!.department)).toBe(elecId);
+      } else {
+        expect(t).toMatchObject({ status: 'Assigned' });
+        expect(String(t!.department)).toBe(itId);
+      }
+      // Each history entry starts from the status the previous entry ended in.
+      t!.statusHistory.slice(1).forEach((h, k) => expect(h.from).toBe(t!.statusHistory[k]!.to));
+    }
+  });
+});

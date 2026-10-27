@@ -4,7 +4,8 @@ import { listTickets } from '../../api/tickets';
 import { getDepartments } from '../../api/admin';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeader } from '../../components/AppLayout';
-import { EmptyState, ErrorState, PageLoader } from '../../components/ui/States';
+import { EmptyState, ErrorState } from '../../components/ui/States';
+import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Pagination } from '../../components/ui/Pagination';
 import { TicketFilters, useTicketQueryFromUrl } from '../../components/tickets/TicketFilters';
 import { TicketTable } from '../../components/tickets/TicketTable';
@@ -47,7 +48,7 @@ export function TicketsPage() {
       <TicketFilters showAdminFilters={isAdmin} departments={departments.data} />
       <div className="mt-4">
         {tickets.isPending ? (
-          <PageLoader label="Loading tickets…" />
+          <SkeletonTable label="Loading tickets…" />
         ) : tickets.isError ? (
           <ErrorState
             title="Could not load tickets"
