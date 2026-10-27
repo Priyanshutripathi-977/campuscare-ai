@@ -112,20 +112,29 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 The server **refuses to start** if `JWT_SECRET` is missing, too short, or still the placeholder from `.env.example`.
 
-| Variable                                                        | Required? | Default                                | What it does                                                                    |
-| --------------------------------------------------------------- | --------- | -------------------------------------- | ------------------------------------------------------------------------------- |
-| `JWT_SECRET`                                                    | **yes**   | —                                      | Signs login cookies. Long, random, never shared.                                |
-| `MONGODB_URI`                                                   | no        | `mongodb://127.0.0.1:27017/campuscare` | Database address                                                                |
-| `API_PORT`                                                      | no        | `4000`                                 | Port of the Express API                                                         |
-| `CLIENT_ORIGIN`                                                 | no        | `http://localhost:5173`                | The website's address (CORS, email links)                                       |
-| `GEMINI_API_KEY`                                                | no        | empty                                  | Turns on Gemini. Empty = keyword fallback (all complaints reviewed by an admin) |
-| `GEMINI_MODEL`                                                  | no        | `gemini-2.5-flash`                     | Which Gemini model to call                                                      |
-| `AI_TIMEOUT_MS`                                                 | no        | `12000`                                | How long to wait for Gemini before falling back                                 |
-| `MAX_UPLOAD_MB`                                                 | no        | `5`                                    | Photo size limit                                                                |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | no        | empty                                  | Turns on email notifications. Empty = in-app only                               |
-| `APP_URL`                                                       | no        | `CLIENT_ORIGIN`                        | Base address used for links in emails                                           |
+| Variable                                                        | Required? | Default                                | What it does                                                                          |
+| --------------------------------------------------------------- | --------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `JWT_SECRET`                                                    | **yes**   | —                                      | Signs login cookies. Long, random, never shared.                                      |
+| `MONGODB_URI`                                                   | no        | `mongodb://127.0.0.1:27017/campuscare` | Database address                                                                      |
+| `API_PORT`                                                      | no        | `4000`                                 | Port of the Express API                                                               |
+| `CLIENT_ORIGIN`                                                 | no        | `http://localhost:5173`                | The website's address (CORS, email links)                                             |
+| `GEMINI_API_KEY`                                                | no        | empty                                  | Turns on Gemini. Empty = keyword fallback (all complaints reviewed by an admin)       |
+| `GEMINI_MODEL`                                                  | no        | `gemini-3.5-flash-lite`                | Which Gemini model to call                                                            |
+| `AI_TIMEOUT_MS`                                                 | no        | `20000`                                | How long to wait for Gemini before falling back                                       |
+| `MAX_UPLOAD_MB`                                                 | no        | `5`                                    | Photo size limit                                                                      |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | no        | empty                                  | Turns on email notifications. Empty = in-app only                                     |
+| `APP_URL`                                                       | no        | `CLIENT_ORIGIN`                        | Base address used for links in emails                                                 |
+| `SHOW_ERROR_DETAILS`                                            | no        | `false`                                | Developer aid: include the real error message in 500 responses. Ignored in production |
 
 All of these are read **only by the server**. The browser is only ever told _whether_ AI and email are switched on.
+
+**Seeing emails locally (Mailpit).** The demo accounts use `@campuscare.test` addresses, which are not real mailboxes. To see the emails the app sends, run the free [Mailpit](https://mailpit.axllent.org) mail catcher. It accepts every email and shows it in a web inbox; nothing leaves your computer:
+
+```bash
+brew install mailpit && brew services start mailpit
+```
+
+Then set `SMTP_HOST=127.0.0.1` and `SMTP_PORT=1025` in `.env` (leave `SMTP_USER` and `SMTP_PASS` empty), restart `npm run dev`, and open http://localhost:8025. Mailpit keeps its messages in a temporary file, so they are cleared when your Mac restarts.
 
 ## 3. Load demo data (optional, recommended for a demo)
 
@@ -268,16 +277,16 @@ campus routing/
 
 ## Security summary
 
-| Risk                              | What the app does                                                                                                                                                                   |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stolen login                      | httpOnly, SameSite=Lax cookie (page scripts can't read it); 1-day expiry; the user is re-checked on every request                                                                   |
-| Wrong person sees or changes data | `requireRole` and ownership/department checks in services; other people's tickets return **404** (we don't reveal that they exist). Tested for **every endpoint × 6 kinds of user** |
-| Bad or malicious input            | zod validation on every body, query and parameter; length limits; database operator objects rejected                                                                                |
-| Dangerous uploads                 | jpg/png/webp only, checked by **file content**; ≤ 5 MB; random file names; served only to people who may see the ticket                                                             |
-| Password guessing / spam          | Rate limits on login, registration and complaint submission                                                                                                                         |
-| AI misuse / prompt injection      | The AI has no tools; its output is schema-validated; plain-code rules decide routing; Critical always needs a human (default)                                                       |
-| Leaking secrets                   | API keys and SMTP settings stay on the server (verified once by building with a fake key and searching the output); the placeholder JWT secret is refused                           |
-| Privacy                           | Dashboards show only counts; staff see a student's name, not their email; Gemini receives only the complaint text and location                                                      |
+| Risk                              | What the app does                                                                                                                                                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stolen login                      | httpOnly, SameSite=Lax cookie (page scripts can't read it); 1-day expiry; the user is re-checked on every request; **logout revokes the token on the server** (a copied cookie stops working; signs out all devices) |
+| Wrong person sees or changes data | `requireRole` and ownership/department checks in services; other people's tickets return **404** (we don't reveal that they exist). Tested for **every endpoint × 6 kinds of user**                                  |
+| Bad or malicious input            | zod validation on every body, query and parameter; length limits; database operator objects rejected                                                                                                                 |
+| Dangerous uploads                 | jpg/png/webp only, checked by **file content**; ≤ 5 MB; random file names; served only to people who may see the ticket                                                                                              |
+| Password guessing / spam          | Rate limits on login, registration and complaint submission                                                                                                                                                          |
+| AI misuse / prompt injection      | The AI has no tools; its output is schema-validated; plain-code rules decide routing; Critical always needs a human (default)                                                                                        |
+| Leaking secrets                   | API keys and SMTP settings stay on the server (verified once by building with a fake key and searching the output); the placeholder JWT secret is refused                                                            |
+| Privacy                           | Dashboards show only counts; staff see a student's name, not their email; Gemini receives only the complaint text and location                                                                                       |
 
 ---
 

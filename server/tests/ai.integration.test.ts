@@ -4,6 +4,7 @@ import type TestAgent from 'supertest/lib/agent';
 import { createApp } from '../src/app';
 import { setAiProvider } from '../src/services/ai/provider';
 import { DepartmentModel } from '../src/models/Department';
+import { TicketModel } from '../src/models/Ticket';
 import { startTestDatabase, stopTestDatabase } from './helpers/db';
 import { clearDatabase, createUser, loginAs, validComplaint } from './helpers/fixtures';
 import { failingProvider, fakeProvider, goodAnswer } from './helpers/fakeAi';
@@ -194,6 +195,48 @@ describe('clarification flow', () => {
     expect(answered.status).toBe('Assigned');
     expect(answered.ai).toMatchObject({ needsClarification: false, clarificationQuestion: null }); // the question is gone
     expect(answered.statusHistory.at(-1).note).toMatch(/after student added details/);
+  });
+});
+
+describe('clarification after an admin decision (regression: audit B1)', () => {
+  it("a student's answer never overwrites the admin's category/priority or routes the ticket", async () => {
+    // The AI asks for clarification and, after the answer, would suggest IT / Low at high confidence.
+    const { provider, calls } = fakeProvider((input) =>
+      JSON.stringify(
+        input.followUps?.length
+          ? goodAnswer({ category: 'IT', priority: 'Low', confidence: 0.95 })
+          : goodAnswer({
+              confidence: 0.3,
+              needsClarification: true,
+              clarificationQuestion: 'Where exactly?',
+            }),
+      ),
+    );
+    setAiProvider(provider);
+    const t = (await submit()).body.ticket;
+
+    // The admin decides before the student answers: Electrical / Critical.
+    await admin
+      .patch(`/api/tickets/${t.ticketId}/classification`)
+      .send({ category: 'Electrical', priority: 'Critical' });
+    const before = await TicketModel.findOne({ ticketId: t.ticketId }).lean();
+
+    await student
+      .post(`/api/tickets/${t.ticketId}/updates`)
+      .send({ message: 'It is room 101, the fan sparks.' });
+    const after = await TicketModel.findOne({ ticketId: t.ticketId }).lean();
+
+    expect(calls).toHaveLength(2); // the answer WAS analysed…
+    expect(after).toMatchObject({
+      category: 'Electrical',
+      priority: 'Critical',
+      status: 'Under Review',
+      department: null,
+    }); // …but nothing the admin decided changed
+    expect(after!.classification!.source).toBe('admin');
+    expect(after!.dueAt!.getTime()).toBe(before!.dueAt!.getTime());
+    expect(after!.ai).toMatchObject({ category: 'IT', needsClarification: false }); // fresh analysis kept as a note
+    expect(after!.reviewReasons).not.toContain('needs_clarification');
   });
 });
 

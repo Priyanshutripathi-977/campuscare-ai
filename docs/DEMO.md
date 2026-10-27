@@ -98,8 +98,9 @@ Every step below uses features that **really work** in the app. Where something 
    Type `Replaced the fan bearing and tightened the bracket`, tick the box and confirm.
 
 4. Mention that staff can also **Send back for review** with a reason, if a ticket reached the wrong department.
-5. Window A: log back in as **Aarav**. The **bell** shows unread notifications ("Your complaint was sent to Electrical Maintenance", "Work has started…", "…marked as resolved: Replaced the fan bearing…"). Each one says **In-app only**.
-   > "Email is a real feature too, but it's switched off because no mail server is configured. The app never claims an email was sent when it wasn't."
+5. Window A: log back in as **Aarav**. The **bell** shows unread notifications ("Your complaint was sent to Electrical Maintenance", "Work has started…", "…marked as resolved: Replaced the fan bearing…"). Each one says **✓ Email sent**.
+   _Show_ http://localhost:8025 (Mailpit, see README): the same notifications arrived there as real emails.
+   > "These are real emails sent over SMTP. For the demo they go to a local mail catcher, because the demo accounts don't have real mailboxes. If no mail server is configured, the bell says **In-app only**; the app never claims an email was sent when it wasn't."
 6. Open the ticket. _Point out_ the full **history** with who did each step and when. Then click **Reopen this ticket** with a reason. Reopening is only possible for the student who reported it.
 
 ## 6. Duplicate detection (1.5 min), window B as Admin

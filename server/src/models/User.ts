@@ -10,6 +10,8 @@ const userSchema = new Schema(
     role: { type: String, enum: ROLES, required: true, default: 'student' },
     department: { type: Schema.Types.ObjectId, ref: 'Department', default: null }, // staff only
     studentId: { type: String, trim: true, maxlength: 30 },
+    // Increased on logout: every login token issued before that stops working (see middleware/auth).
+    tokenVersion: { type: Number, default: 0 },
     isDemo: { type: Boolean, default: false },
   },
   { timestamps: true },

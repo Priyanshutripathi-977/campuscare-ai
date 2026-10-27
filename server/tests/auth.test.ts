@@ -104,3 +104,52 @@ describe('login / me / logout', () => {
     expect(res.body.error.message).toMatch(/too many/i);
   });
 });
+
+describe('logout revokes the token on the server (audit R1)', () => {
+  it('a login cookie copied before logout no longer works afterwards', async () => {
+    await createUser('student', 's@x.test');
+    const agent = request.agent(app);
+    const login = await agent
+      .post('/api/auth/login')
+      .send({ email: 's@x.test', password: PASSWORD });
+    const copied = String(login.headers['set-cookie']).split(';')[0]!;
+    expect((await request(app).get('/api/tickets').set('Cookie', copied)).status).toBe(200);
+
+    expect((await agent.post('/api/auth/logout')).status).toBe(204);
+    const reuse = await request(app).get('/api/tickets').set('Cookie', copied);
+    expect(reuse.status).toBe(401);
+    expect(reuse.body.error.message).toMatch(/logged out/i);
+  });
+
+  it('logging out signs the account out on other devices too; logging in again works', async () => {
+    await createUser('student', 's@x.test');
+    const laptop = request.agent(app);
+    const phone = request.agent(app);
+    await laptop.post('/api/auth/login').send({ email: 's@x.test', password: PASSWORD });
+    await phone.post('/api/auth/login').send({ email: 's@x.test', password: PASSWORD });
+    await laptop.post('/api/auth/logout');
+    expect((await phone.get('/api/auth/me')).status).toBe(401);
+    await phone.post('/api/auth/login').send({ email: 's@x.test', password: PASSWORD });
+    expect((await phone.get('/api/auth/me')).status).toBe(200);
+  });
+
+  it('tokens issued before this change (no version inside) keep working until the user logs out', async () => {
+    const user = await createUser('student', 'old@x.test');
+    const jwt = (await import('jsonwebtoken')).default;
+    const { env } = await import('../src/config/env');
+    const legacy = jwt.sign({ sub: String(user._id), role: 'student' }, env.JWT_SECRET, {
+      expiresIn: 3600,
+      algorithm: 'HS256',
+    });
+    expect(
+      (await request(app).get('/api/auth/me').set('Cookie', `cc_token=${legacy}`)).status,
+    ).toBe(200);
+  });
+
+  it('logout without (or with a broken) cookie still succeeds', async () => {
+    expect((await request(app).post('/api/auth/logout')).status).toBe(204);
+    expect(
+      (await request(app).post('/api/auth/logout').set('Cookie', 'cc_token=garbage')).status,
+    ).toBe(204);
+  });
+});

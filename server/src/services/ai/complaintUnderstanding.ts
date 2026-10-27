@@ -44,7 +44,7 @@ export async function understandComplaint(
   input: ComplaintInput,
   provider: AiProvider | null,
   {
-    timeoutMs = 12_000,
+    timeoutMs = 20_000,
     log = console.warn,
   }: { timeoutMs?: number; log?: (msg: string) => void } = {},
 ): Promise<AiResult> {

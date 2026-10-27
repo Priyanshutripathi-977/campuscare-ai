@@ -3,7 +3,15 @@ import bcrypt from 'bcryptjs';
 import { LoginSchema, RegisterSchema, type UserDTO } from '@campuscare/shared';
 import { UserModel } from '../models/User';
 import { DepartmentModel } from '../models/Department';
-import { clearAuthCookie, requireAuth, setAuthCookie } from '../middleware/auth';
+import jwt from 'jsonwebtoken';
+import {
+  AUTH_COOKIE,
+  clearAuthCookie,
+  requireAuth,
+  setAuthCookie,
+  tokenVersionOf,
+} from '../middleware/auth';
+import { env } from '../config/env';
 import type { createLimiters } from '../middleware/rateLimit';
 import { parse } from '../utils/validate';
 import { HttpError } from '../utils/HttpError';
@@ -49,7 +57,7 @@ export function authRouter(limiters: ReturnType<typeof createLimiters>) {
       role: 'student',
       studentId: input.studentId,
     });
-    setAuthCookie(res, String(user._id), 'student');
+    setAuthCookie(res, String(user._id), 'student', 0);
     res.status(201).json({ user: await toUserDTO(user) });
   });
 
@@ -59,11 +67,25 @@ export function authRouter(limiters: ReturnType<typeof createLimiters>) {
     const ok = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
     // Same message for "no such email" and "wrong password" so attackers can't probe emails.
     if (!user || !ok) throw new HttpError(401, 'Incorrect email or password');
-    setAuthCookie(res, String(user._id), user.role as UserDTO['role']);
+    setAuthCookie(res, String(user._id), user.role as UserDTO['role'], tokenVersionOf(user));
     res.json({ user: await toUserDTO(user) });
   });
 
-  router.post('/logout', (_req, res) => {
+  // Logout revokes the token on the server too: increasing the user's token version makes every
+  // token issued before now invalid (so a copied cookie stops working). This signs the account
+  // out on all devices. Always succeeds, even without a valid cookie.
+  router.post('/logout', async (req, res) => {
+    const token: unknown = req.cookies?.[AUTH_COOKIE];
+    if (typeof token === 'string') {
+      try {
+        const payload = jwt.verify(token, env.JWT_SECRET, {
+          algorithms: ['HS256'],
+        }) as jwt.JwtPayload;
+        await UserModel.updateOne({ _id: payload.sub }, { $inc: { tokenVersion: 1 } });
+      } catch {
+        // invalid/expired token: nothing to revoke
+      }
+    }
     clearAuthCookie(res);
     res.status(204).end();
   });

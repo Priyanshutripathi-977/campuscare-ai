@@ -223,3 +223,36 @@ describe('malformed requests', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/stack|mongo|at \//i);
   });
 });
+
+describe('unexpected errors (audit R2)', () => {
+  it('a 500 never includes internal details unless SHOW_ERROR_DETAILS is explicitly enabled', async () => {
+    const { vi } = await import('vitest');
+    const boom = vi
+      .spyOn(TicketModel, 'countDocuments')
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED 10.0.0.5:27017 /secret/path'));
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await admin.get('/api/tickets');
+    boom.mockRestore();
+    quiet.mockRestore();
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({
+      error: { message: 'Something went wrong on our side. Please try again.' },
+    });
+    expect(JSON.stringify(res.body)).not.toMatch(/ECONNREFUSED|secret|10\.0\.0\.5/);
+  });
+
+  it('the setting only accepts true/false', async () => {
+    const { validateEnv } = await import('../src/config/env');
+    expect(
+      validateEnv({
+        NODE_ENV: 'development',
+        JWT_SECRET: 'x'.repeat(40),
+        SHOW_ERROR_DETAILS: 'yes',
+      }).success,
+    ).toBe(false);
+    expect(
+      validateEnv({ NODE_ENV: 'development', JWT_SECRET: 'x'.repeat(40), SHOW_ERROR_DETAILS: '' })
+        .data?.SHOW_ERROR_DETAILS,
+    ).toBe(false);
+  });
+});

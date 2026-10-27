@@ -12,7 +12,7 @@ Base URL: `/api` (in development the React app proxies `/api` to `http://localho
     }
   }
   ```
-- **Status codes:** `400` invalid input · `401` not logged in · `403` wrong role · `404` not found _or not yours_ · `409` action not allowed in the current state · `413` body too large · `415` unsupported format · `429` rate-limited · `503` database down.
+- **Status codes:** `400` invalid input · `401` not logged in · `403` wrong role · `404` not found _or not yours_ · `409` action not allowed in the current state, or the ticket was changed by someone else at the same moment (status, department or assignee): refresh and retry · `413` body too large · `415` unsupported format · `429` rate-limited · `503` database down.
 - Validation rules live in [`shared/src/schemas.ts`](../shared/src/schemas.ts) and are used by both client and server.
 
 Roles: 🔓 public · 🎓 student · 🛠 staff · 👑 admin
@@ -57,12 +57,12 @@ Add `-F 'image=@photo.jpg'` to attach a photo (JPG/PNG/WebP, ≤ 5 MB). Add `| j
 
 ## Auth
 
-| Method | Path             | Who       | Body                                    | Notes                                                                            |
-| ------ | ---------------- | --------- | --------------------------------------- | -------------------------------------------------------------------------------- |
-| POST   | `/auth/register` | 🔓        | `{ name, email, password, studentId? }` | Always creates a **student**. 10/hour/IP.                                        |
-| POST   | `/auth/login`    | 🔓        | `{ email, password }`                   | Same error for unknown email & wrong password. 10 failed attempts / 15 min / IP. |
-| POST   | `/auth/logout`   | any       | —                                       | `204`                                                                            |
-| GET    | `/auth/me`       | logged in | —                                       | `{ user: { id, name, email, role, department } }`                                |
+| Method | Path             | Who       | Body                                    | Notes                                                                                                                                    |
+| ------ | ---------------- | --------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/register` | 🔓        | `{ name, email, password, studentId? }` | Always creates a **student**. 10/hour/IP.                                                                                                |
+| POST   | `/auth/login`    | 🔓        | `{ email, password }`                   | Same error for unknown email & wrong password. 10 failed attempts / 15 min / IP.                                                         |
+| POST   | `/auth/logout`   | any       | —                                       | `204`. Also revokes the login on the server: every token issued before this logout stops working (signs the account out on all devices). |
+| GET    | `/auth/me`       | logged in | —                                       | `{ user: { id, name, email, role, department } }`                                                                                        |
 
 ## Tickets
 

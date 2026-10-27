@@ -22,8 +22,12 @@ const cookieOptions: CookieOptions = {
   path: '/',
 };
 
-export function setAuthCookie(res: Response, userId: string, role: Role) {
-  const token = jwt.sign({ sub: userId, role }, env.JWT_SECRET, {
+/** Users created before tokenVersion existed have no value stored: treat that as 0. */
+export const tokenVersionOf = (user: { tokenVersion?: number | null }) => user.tokenVersion ?? 0;
+
+export function setAuthCookie(res: Response, userId: string, role: Role, tokenVersion: number) {
+  // `tv` = the user's token version at login time; logout increases it (server-side revocation).
+  const token = jwt.sign({ sub: userId, role, tv: tokenVersion }, env.JWT_SECRET, {
     expiresIn: TOKEN_TTL_SECONDS,
     algorithm: 'HS256',
   });
@@ -49,6 +53,10 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   // Load the user fresh from the DB so deleted users / changed roles take effect immediately.
   const user = await UserModel.findById(payload.sub).lean();
   if (!user) throw new HttpError(401, 'Your session is no longer valid. Please log in again.');
+  // A token issued before the user's last logout is no longer valid, even if it has not expired.
+  if ((payload.tv ?? 0) !== tokenVersionOf(user)) {
+    throw new HttpError(401, 'You have been logged out. Please log in again.');
+  }
 
   req.user = {
     id: String(user._id),
